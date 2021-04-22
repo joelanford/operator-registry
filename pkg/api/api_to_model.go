@@ -3,7 +3,6 @@ package api
 import (
 	"encoding/json"
 	"fmt"
-	"path/filepath"
 	"strings"
 
 	"github.com/ghodss/yaml"
@@ -119,8 +118,8 @@ func convertAPIBundleToModelProperties(b *Bundle) ([]property.Property, error) {
 		out = append(out, property.MustBuildGVKRequired(p.Group, p.Version, p.Kind))
 	}
 
-	for i, obj := range b.Object {
-		out = append(out, property.MustBuildBundleObjectRef(filepath.Join("objects", b.CsvName, objectFilename(obj, i))))
+	for _, obj := range b.Object {
+		out = append(out, property.MustBuildBundleObjectData([]byte(obj)))
 	}
 
 	return out, nil

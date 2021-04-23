@@ -31,7 +31,7 @@ func NewCmd() *cobra.Command {
 		Short: "Generate declarative config blobs from the provided index and bundle images",
 		Args:  cobra.MinimumNArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
-			imageRefs := args
+			refs := args
 
 			logger := logrus.New()
 			logger.SetOutput(ioutil.Discard)
@@ -45,68 +45,80 @@ func NewCmd() *cobra.Command {
 			defer reg.Destroy()
 
 			var out bytes.Buffer
-			for _, imageRef := range imageRefs {
-				ref := image.SimpleReference(imageRef)
-				if err := reg.Pull(cmd.Context(), ref); err != nil {
-					log.Fatal(err)
-				}
-				labels, err := reg.Labels(cmd.Context(), ref)
-				if err != nil {
-					log.Fatal(err)
-				}
-				tmpDir, err := ioutil.TempDir("", "opm-unpack-")
-				if err != nil {
-					log.Fatal(err)
-				}
-				defer os.RemoveAll(tmpDir)
-				if err := reg.Unpack(cmd.Context(), ref, tmpDir); err != nil {
-					log.Fatal(err)
-				}
-
+			for _, ref := range refs {
 				var cfg *declcfg.DeclarativeConfig
-				if dbFile, ok := labels[containertools.DbLocationLabel]; ok {
-					cfg, err = sqliteToDeclcfg(cmd.Context(), filepath.Join(tmpDir, dbFile))
-					if err != nil {
-						log.Fatal(err)
-					}
-				} else if configsDir, ok := labels["operators.operatorframework.io.index.configs.v1"]; ok {
-					cfg, err = declcfg.LoadDir(filepath.Join(tmpDir, configsDir))
-					if err != nil {
-						log.Fatal(err)
-					}
-					renderBundleObjects(cfg)
-				} else if _, ok := labels[bundle.PackageLabel]; ok {
-					img, err := registry.NewImageInput(ref, tmpDir)
-					if err != nil {
-						log.Fatal(err)
-					}
-
-					cfg, err = bundleToDeclcfg(img.Bundle)
-					if err != nil {
-						log.Fatal(err)
-					}
+				if stat, serr := os.Stat(ref); serr == nil && stat.IsDir() {
+					cfg, err = declcfg.LoadDir(ref)
 				} else {
-					labelKeys := sets.StringKeySet(labels)
-					labelVals := []string{}
-					for _, k := range labelKeys.List() {
-						labelVals = append(labelVals, fmt.Sprintf("  %s=%s", k, labels[k]))
-					}
-					if len(labelVals) > 0 {
-						log.Fatalf("unpack %q: image type could not be determined, found labels\n%s", ref, strings.Join(labelVals, "\n"))
-					} else {
-						log.Fatalf("unpack %q: image type could not be determined: image has no labels", ref)
-					}
+					cfg, err = imageToDeclcfg(cmd.Context(), reg, ref)
 				}
+				if err != nil {
+					log.Fatal(err)
+				}
+				renderBundleObjects(cfg)
 				if err := declcfg.WriteYAML(*cfg, &out); err != nil {
 					log.Fatal(err)
 				}
 			}
-
 			if _, err := fmt.Fprint(os.Stdout, out.String()); err != nil {
 				log.Fatal(err)
 			}
 		},
 	}
+}
+
+func imageToDeclcfg(ctx context.Context, reg *containerdregistry.Registry, imageRef string) (*declcfg.DeclarativeConfig, error) {
+	ref := image.SimpleReference(imageRef)
+	if err := reg.Pull(ctx, ref); err != nil {
+		return nil, err
+	}
+	labels, err := reg.Labels(ctx, ref)
+	if err != nil {
+		return nil, err
+	}
+	tmpDir, err := ioutil.TempDir("", "opm-unpack-")
+	if err != nil {
+		return nil, err
+	}
+	defer os.RemoveAll(tmpDir)
+	if err := reg.Unpack(ctx, ref, tmpDir); err != nil {
+		return nil, err
+	}
+
+	var cfg *declcfg.DeclarativeConfig
+	if dbFile, ok := labels[containertools.DbLocationLabel]; ok {
+		cfg, err = sqliteToDeclcfg(ctx, filepath.Join(tmpDir, dbFile))
+		if err != nil {
+			return nil, err
+		}
+	} else if configsDir, ok := labels["operators.operatorframework.io.index.configs.v1"]; ok {
+		cfg, err = declcfg.LoadDir(filepath.Join(tmpDir, configsDir))
+		if err != nil {
+			return nil, err
+		}
+	} else if _, ok := labels[bundle.PackageLabel]; ok {
+		img, err := registry.NewImageInput(ref, tmpDir)
+		if err != nil {
+			return nil, err
+		}
+
+		cfg, err = bundleToDeclcfg(img.Bundle)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		labelKeys := sets.StringKeySet(labels)
+		labelVals := []string{}
+		for _, k := range labelKeys.List() {
+			labelVals = append(labelVals, fmt.Sprintf("  %s=%s", k, labels[k]))
+		}
+		if len(labelVals) > 0 {
+			return nil, fmt.Errorf("unpack %q: image type could not be determined, found labels\n%s", ref, strings.Join(labelVals, "\n"))
+		} else {
+			return nil, fmt.Errorf("unpack %q: image type could not be determined: image has no labels", ref)
+		}
+	}
+	return cfg, nil
 }
 
 func sqliteToDeclcfg(ctx context.Context, dbFile string) (*declcfg.DeclarativeConfig, error) {

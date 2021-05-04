@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"log"
 	"os"
@@ -26,13 +27,23 @@ import (
 )
 
 func NewCmd() *cobra.Command {
-	return &cobra.Command{
+	output := ""
+	cmd := &cobra.Command{
 		Use:   "unpack <index-or-bundle-image1> <index-or-bundle-image2> <index-or-bundle-imageN>",
 		Short: "Generate declarative config blobs from the provided index and bundle images",
 		Args:  cobra.MinimumNArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
 			refs := args
 
+			var write func(declcfg.DeclarativeConfig, io.Writer) error
+			switch output {
+			case "yaml":
+				write = declcfg.WriteYAML
+			case "json":
+				write = declcfg.WriteJSON
+			default:
+				log.Fatalf("invalid --output value %q, expected (json|yaml)", output)
+			}
 			logger := logrus.New()
 			logger.SetOutput(ioutil.Discard)
 			nullLogger := logrus.NewEntry(logger)
@@ -60,7 +71,7 @@ func NewCmd() *cobra.Command {
 					log.Fatal(err)
 				}
 				renderBundleObjects(cfg)
-				if err := declcfg.WriteYAML(*cfg, &out); err != nil {
+				if err := write(*cfg, &out); err != nil {
 					log.Fatal(err)
 				}
 			}
@@ -69,6 +80,8 @@ func NewCmd() *cobra.Command {
 			}
 		},
 	}
+	cmd.Flags().StringVarP(&output, "output", "o", "json", "Output format (json|yaml)")
+	return cmd
 }
 
 func imageToDeclcfg(ctx context.Context, reg *containerdregistry.Registry, imageRef string) (*declcfg.DeclarativeConfig, error) {

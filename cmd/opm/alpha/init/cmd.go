@@ -1,6 +1,7 @@
 package init
 
 import (
+	"io"
 	"io/ioutil"
 	"log"
 	"os"
@@ -16,6 +17,7 @@ func NewCmd() *cobra.Command {
 		defaultChannel string
 		iconFile       string
 		description    string
+		output         string
 	)
 	cmd := &cobra.Command{
 		Use:   "init <packageName>",
@@ -23,6 +25,16 @@ func NewCmd() *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
 			packageName := args[0]
+
+			var write func(declcfg.DeclarativeConfig, io.Writer) error
+			switch output {
+			case "yaml":
+				write = declcfg.WriteYAML
+			case "json":
+				write = declcfg.WriteJSON
+			default:
+				log.Fatalf("invalid --output value %q, expected (json|yaml)", output)
+			}
 
 			pkg := declcfg.Package{
 				Schema:         "olm.package",
@@ -49,7 +61,7 @@ func NewCmd() *cobra.Command {
 				}
 			}
 			cfg := declcfg.DeclarativeConfig{Packages: []declcfg.Package{pkg}}
-			if err := declcfg.WriteYAML(cfg, os.Stdout); err != nil {
+			if err := write(cfg, os.Stdout); err != nil {
 				log.Fatal(err)
 			}
 		},
@@ -59,5 +71,6 @@ func NewCmd() *cobra.Command {
 
 	// TODO: support reading description from a file.
 	cmd.Flags().StringVarP(&description, "description", "d", "", "Description of the operator package")
+	cmd.Flags().StringVarP(&output, "output", "o", "json", "Output format (json|yaml)")
 	return cmd
 }

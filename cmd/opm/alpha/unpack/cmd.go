@@ -38,7 +38,11 @@ func NewCmd() *cobra.Command {
 			nullLogger := logrus.NewEntry(logger)
 			logrus.SetOutput(ioutil.Discard)
 
-			reg, err := containerdregistry.NewRegistry(containerdregistry.WithLog(nullLogger))
+			cacheDir, err := os.MkdirTemp("", "opm-unpack-")
+			if err != nil {
+				log.Fatal(err)
+			}
+			reg, err := containerdregistry.NewRegistry(containerdregistry.WithCacheDir(cacheDir), containerdregistry.WithLog(nullLogger))
 			if err != nil {
 				log.Fatal(err)
 			}

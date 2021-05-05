@@ -1,4 +1,4 @@
-package unpack
+package render
 
 import (
 	"bytes"
@@ -29,7 +29,7 @@ import (
 func NewCmd() *cobra.Command {
 	output := ""
 	cmd := &cobra.Command{
-		Use:   "unpack <index-or-bundle-image1> <index-or-bundle-image2> <index-or-bundle-imageN>",
+		Use:   "render <index-or-bundle-image1> <index-or-bundle-image2> <index-or-bundle-imageN>",
 		Short: "Generate declarative config blobs from the provided index and bundle images",
 		Args:  cobra.MinimumNArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {

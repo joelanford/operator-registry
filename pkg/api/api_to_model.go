@@ -3,6 +3,7 @@ package api
 import (
 	"encoding/json"
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/ghodss/yaml"
@@ -121,6 +122,13 @@ func convertAPIBundleToModelProperties(b *Bundle) ([]property.Property, error) {
 	for _, obj := range b.Object {
 		out = append(out, property.MustBuildBundleObjectData([]byte(obj)))
 	}
+
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].Type != out[j].Type {
+			return out[i].Type < out[j].Type
+		}
+		return string(out[i].Value) < string(out[j].Value)
+	})
 
 	return out, nil
 }

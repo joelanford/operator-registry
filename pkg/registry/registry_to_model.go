@@ -3,6 +3,7 @@ package registry
 import (
 	"encoding/json"
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/operator-framework/operator-registry/internal/model"
@@ -198,14 +199,24 @@ func PropertiesFromBundle(b *Bundle) ([]property.Property, error) {
 	}
 	out = append(out, *packageProvidedProperty)
 	out = append(out, graphProps...)
+
 	for p := range providedGVKs {
 		out = append(out, property.MustBuildGVK(p.Group, p.Version, p.Kind))
 	}
+
 	for p := range requiredGVKs {
 		out = append(out, property.MustBuildGVKRequired(p.Group, p.Version, p.Kind))
 	}
+
 	out = append(out, packageRequiredProps...)
 	out = append(out, otherProps...)
+
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].Type != out[j].Type {
+			return out[i].Type < out[j].Type
+		}
+		return string(out[i].Value) < string(out[j].Value)
+	})
 
 	return out, nil
 }

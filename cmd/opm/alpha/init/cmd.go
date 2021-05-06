@@ -14,10 +14,10 @@ import (
 
 func NewCmd() *cobra.Command {
 	var (
-		defaultChannel string
-		iconFile       string
-		description    string
-		output         string
+		defaultChannel  string
+		iconFile        string
+		descriptionFile string
+		output          string
 	)
 	cmd := &cobra.Command{
 		Use:   "init <packageName>",
@@ -40,7 +40,14 @@ func NewCmd() *cobra.Command {
 				Schema:         "olm.package",
 				Name:           packageName,
 				DefaultChannel: defaultChannel,
-				Description:    description,
+			}
+
+			if descriptionFile != "" {
+				descriptionData, err := ioutil.ReadFile(descriptionFile)
+				if err != nil {
+					log.Fatalf("read description file %q: %v", iconFile, err)
+				}
+				pkg.Description = string(descriptionData)
 			}
 
 			if iconFile != "" {
@@ -68,9 +75,7 @@ func NewCmd() *cobra.Command {
 	}
 	cmd.Flags().StringVarP(&defaultChannel, "default-channel", "c", "", "The channel that subscriptions will default to if unspecified")
 	cmd.Flags().StringVarP(&iconFile, "icon", "i", "", "Path to package's icon")
-
-	// TODO: support reading description from a file.
-	cmd.Flags().StringVarP(&description, "description", "d", "", "Description of the operator package")
+	cmd.Flags().StringVarP(&descriptionFile, "description", "d", "", "Path to the operator's README.md (or other documentation)")
 	cmd.Flags().StringVarP(&output, "output", "o", "json", "Output format (json|yaml)")
 	return cmd
 }

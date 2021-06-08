@@ -10,7 +10,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 
-	"github.com/operator-framework/operator-registry/internal/declcfg"
+	declcfg2 "github.com/operator-framework/operator-registry/alpha/declcfg"
 	"github.com/operator-framework/operator-registry/pkg/api"
 	health "github.com/operator-framework/operator-registry/pkg/api/grpc_health_v1"
 	"github.com/operator-framework/operator-registry/pkg/lib/dns"
@@ -72,12 +72,12 @@ func (s *serve) run(ctx context.Context) error {
 
 	s.logger = s.logger.WithFields(logrus.Fields{"configs": s.configDir, "port": s.port})
 
-	cfg, err := declcfg.LoadDir(s.configDir)
+	cfg, err := declcfg2.LoadDir(s.configDir)
 	if err != nil {
 		return fmt.Errorf("load declarative config directory: %v", err)
 	}
 
-	m, err := declcfg.ConvertToModel(*cfg)
+	m, err := declcfg2.ConvertToModel(*cfg)
 	if err != nil {
 		return fmt.Errorf("could not build index model from declarative config: %v", err)
 	}

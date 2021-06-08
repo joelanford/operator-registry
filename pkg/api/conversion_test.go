@@ -6,8 +6,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/operator-framework/operator-registry/internal/model"
-	"github.com/operator-framework/operator-registry/internal/property"
+	model2 "github.com/operator-framework/operator-registry/alpha/model"
+	property2 "github.com/operator-framework/operator-registry/alpha/property"
 )
 
 func TestConvertAPIBundleToModelBundle(t *testing.T) {
@@ -21,8 +21,8 @@ func TestConvertAPIBundleToModelBundle(t *testing.T) {
 
 func TestConvertModelBundleToAPIBundle(t *testing.T) {
 	modelBundle := testModelBundle()
-	modelBundle.Package = &model.Package{Name: "etcd"}
-	modelBundle.Channel = &model.Channel{Name: "singlenamespace-alpha"}
+	modelBundle.Package = &model2.Package{Name: "etcd"}
+	modelBundle.Channel = &model2.Channel{Name: "singlenamespace-alpha"}
 	expected := testAPIBundle()
 	expected.Properties = append(expected.Properties,
 		&Property{Type: "olm.channel", Value: "{\"name\":\"singlenamespace-alpha\",\"replaces\":\"etcdoperator.v0.9.2\"}"},
@@ -42,22 +42,22 @@ const (
 	crdrestores = `{"apiVersion":"apiextensions.k8s.io/v1beta1","kind":"CustomResourceDefinition","metadata":{"name":"etcdrestores.etcd.database.coreos.com"},"spec":{"group":"etcd.database.coreos.com","names":{"kind":"EtcdRestore","listKind":"EtcdRestoreList","plural":"etcdrestores","singular":"etcdrestore"},"scope":"Namespaced","version":"v1beta2"}}`
 )
 
-func testModelBundle() model.Bundle {
-	b := model.Bundle{
+func testModelBundle() model2.Bundle {
+	b := model2.Bundle{
 		Name:     "etcdoperator.v0.9.4",
 		Image:    "quay.io/operatorhubio/etcd:v0.9.4",
 		Replaces: "etcdoperator.v0.9.2",
 		Skips:    nil,
-		Properties: []property.Property{
-			property.MustBuildChannel("singlenamespace-alpha", "etcdoperator.v0.9.2"),
-			property.MustBuildPackage("etcd", "0.9.4"),
-			property.MustBuildPackageRequired("test", ">=1.2.3 <2.0.0-0"),
-			property.MustBuildGVKRequired("testapi.coreos.com", "v1", "Testapi"),
-			property.MustBuildGVK("etcd.database.coreos.com", "v1beta2", "EtcdBackup"),
-			property.MustBuildBundleObjectData([]byte(crdbackups)),
-			property.MustBuildBundleObjectData([]byte(crdclusters)),
-			property.MustBuildBundleObjectData([]byte(csvJson)),
-			property.MustBuildBundleObjectData([]byte(crdrestores)),
+		Properties: []property2.Property{
+			property2.MustBuildChannel("singlenamespace-alpha", "etcdoperator.v0.9.2"),
+			property2.MustBuildPackage("etcd", "0.9.4"),
+			property2.MustBuildPackageRequired("test", ">=1.2.3 <2.0.0-0"),
+			property2.MustBuildGVKRequired("testapi.coreos.com", "v1", "Testapi"),
+			property2.MustBuildGVK("etcd.database.coreos.com", "v1beta2", "EtcdBackup"),
+			property2.MustBuildBundleObjectData([]byte(crdbackups)),
+			property2.MustBuildBundleObjectData([]byte(crdclusters)),
+			property2.MustBuildBundleObjectData([]byte(csvJson)),
+			property2.MustBuildBundleObjectData([]byte(crdrestores)),
 		},
 		CsvJSON: csvJson,
 		Objects: []string{
@@ -66,7 +66,7 @@ func testModelBundle() model.Bundle {
 			csvJson,
 			crdrestores,
 		},
-		RelatedImages: []model.RelatedImage{
+		RelatedImages: []model2.RelatedImage{
 			{
 				Name:  "etcdv0.9.4",
 				Image: "quay.io/coreos/etcd-operator@sha256:66a37fd61a06a43969854ee6d3e21087a98b93838e284a6086b13917f96b0d9b",
@@ -107,7 +107,7 @@ func testAPIBundle() Bundle {
 	}
 }
 
-func assertEqualsModelBundle(t *testing.T, a, b model.Bundle) bool {
+func assertEqualsModelBundle(t *testing.T, a, b model2.Bundle) bool {
 	assert.ElementsMatch(t, a.Properties, b.Properties)
 	assert.ElementsMatch(t, a.Objects, b.Objects)
 	assert.ElementsMatch(t, a.Skips, b.Skips)

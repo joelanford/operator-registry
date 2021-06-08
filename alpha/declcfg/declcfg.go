@@ -3,7 +3,7 @@ package declcfg
 import (
 	"encoding/json"
 
-	"github.com/operator-framework/operator-registry/internal/property"
+	property2 "github.com/operator-framework/operator-registry/alpha/property"
 )
 
 const (
@@ -31,12 +31,12 @@ type Icon struct {
 }
 
 type Bundle struct {
-	Schema        string              `json:"schema"`
-	Name          string              `json:"name"`
-	Package       string              `json:"package"`
-	Image         string              `json:"image"`
-	Properties    []property.Property `json:"properties,omitempty"`
-	RelatedImages []RelatedImage      `json:"relatedImages,omitempty"`
+	Schema        string               `json:"schema"`
+	Name          string               `json:"name"`
+	Package       string               `json:"package"`
+	Image         string               `json:"image"`
+	Properties    []property2.Property `json:"properties,omitempty"`
+	RelatedImages []RelatedImage       `json:"relatedImages,omitempty"`
 
 	// These fields are present so that we can continue serving
 	// the GRPC API the way packageserver expects us to in a
@@ -67,9 +67,9 @@ func (m Meta) MarshalJSON() ([]byte, error) {
 
 func (m *Meta) UnmarshalJSON(blob []byte) error {
 	type tmp struct {
-		Schema     string              `json:"schema"`
-		Package    string              `json:"package,omitempty"`
-		Properties []property.Property `json:"properties,omitempty"`
+		Schema     string               `json:"schema"`
+		Package    string               `json:"package,omitempty"`
+		Properties []property2.Property `json:"properties,omitempty"`
 	}
 	var t tmp
 	if err := json.Unmarshal(blob, &t); err != nil {

@@ -6,12 +6,12 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/operator-framework/operator-registry/internal/model"
-	"github.com/operator-framework/operator-registry/internal/property"
+	model2 "github.com/operator-framework/operator-registry/alpha/model"
+	property2 "github.com/operator-framework/operator-registry/alpha/property"
 )
 
-func ConvertRegistryBundleToModelBundles(b *Bundle) ([]model.Bundle, error) {
-	var bundles []model.Bundle
+func ConvertRegistryBundleToModelBundles(b *Bundle) ([]model2.Bundle, error) {
+	var bundles []model2.Bundle
 	desc, err := b.csv.GetDescription()
 	if err != nil {
 		return nil, fmt.Errorf("Could not get description from bundle CSV:%s", err)
@@ -21,7 +21,7 @@ func ConvertRegistryBundleToModelBundles(b *Bundle) ([]model.Bundle, error) {
 	if err != nil {
 		return nil, fmt.Errorf("Could not get icon from bundle CSV:%s", err)
 	}
-	mIcon := &model.Icon{
+	mIcon := &model2.Icon{
 		MediaType: "",
 		Data:      []byte{},
 	}
@@ -30,11 +30,11 @@ func ConvertRegistryBundleToModelBundles(b *Bundle) ([]model.Bundle, error) {
 		mIcon.Data = []byte(i[0].Base64data)
 	}
 
-	pkg := &model.Package{
+	pkg := &model2.Package{
 		Name:        b.Annotations.PackageName,
 		Description: desc,
 		Icon:        mIcon,
-		Channels:    make(map[string]*model.Channel),
+		Channels:    make(map[string]*model2.Channel),
 	}
 
 	mb, err := registryBundleToModelBundle(b)
@@ -44,7 +44,7 @@ func ConvertRegistryBundleToModelBundles(b *Bundle) ([]model.Bundle, error) {
 	}
 
 	for _, ch := range extractChannels(b.Annotations.Channels) {
-		newCh := &model.Channel{
+		newCh := &model2.Channel{
 			Name: ch,
 		}
 		chBundle := mb
@@ -54,7 +54,7 @@ func ConvertRegistryBundleToModelBundles(b *Bundle) ([]model.Bundle, error) {
 	return bundles, nil
 }
 
-func registryBundleToModelBundle(b *Bundle) (*model.Bundle, error) {
+func registryBundleToModelBundle(b *Bundle) (*model2.Bundle, error) {
 	bundleProps, err := PropertiesFromBundle(b)
 	if err != nil {
 		return nil, fmt.Errorf("error converting properties for internal model: %v", err)
@@ -77,7 +77,7 @@ func registryBundleToModelBundle(b *Bundle) (*model.Bundle, error) {
 		return nil, fmt.Errorf("Could not get Related images from bundle: %v", err)
 	}
 
-	return &model.Bundle{
+	return &model2.Bundle{
 		Name:          csv.Name,
 		Image:         b.BundleImage,
 		Replaces:      replaces,
@@ -87,7 +87,7 @@ func registryBundleToModelBundle(b *Bundle) (*model.Bundle, error) {
 	}, nil
 }
 
-func PropertiesFromBundle(b *Bundle) ([]property.Property, error) {
+func PropertiesFromBundle(b *Bundle) ([]property2.Property, error) {
 	csv, err := b.ClusterServiceVersion()
 	if err != nil {
 		return nil, fmt.Errorf("get csv: %v", err)
@@ -98,70 +98,70 @@ func PropertiesFromBundle(b *Bundle) ([]property.Property, error) {
 		return nil, fmt.Errorf("get csv skips: %v", err)
 	}
 
-	var graphProps []property.Property
+	var graphProps []property2.Property
 	replaces, err := csv.GetReplaces()
 	if err != nil {
 		return nil, fmt.Errorf("get csv replaces: %v", err)
 	}
 	for _, ch := range b.Channels {
-		graphProps = append(graphProps, property.MustBuildChannel(ch, replaces))
+		graphProps = append(graphProps, property2.MustBuildChannel(ch, replaces))
 	}
 
 	for _, skip := range skips {
-		graphProps = append(graphProps, property.MustBuildSkips(skip))
+		graphProps = append(graphProps, property2.MustBuildSkips(skip))
 	}
 
 	skipRange := csv.GetSkipRange()
 	if skipRange != "" {
-		graphProps = append(graphProps, property.MustBuildSkipRange(skipRange))
+		graphProps = append(graphProps, property2.MustBuildSkipRange(skipRange))
 	}
 
-	providedGVKs := map[property.GVK]struct{}{}
-	requiredGVKs := map[property.GVKRequired]struct{}{}
+	providedGVKs := map[property2.GVK]struct{}{}
+	requiredGVKs := map[property2.GVKRequired]struct{}{}
 
-	var packageProvidedProperty *property.Property
-	var otherProps []property.Property
+	var packageProvidedProperty *property2.Property
+	var otherProps []property2.Property
 
 	for i, p := range b.Properties {
 		switch p.Type {
-		case property.TypeGVK:
-			var v property.GVK
+		case property2.TypeGVK:
+			var v property2.GVK
 			if err := json.Unmarshal(p.Value, &v); err != nil {
-				return nil, property.ParseError{Idx: i, Typ: p.Type, Err: err}
+				return nil, property2.ParseError{Idx: i, Typ: p.Type, Err: err}
 			}
-			k := property.GVK{Group: v.Group, Kind: v.Kind, Version: v.Version}
+			k := property2.GVK{Group: v.Group, Kind: v.Kind, Version: v.Version}
 			providedGVKs[k] = struct{}{}
-		case property.TypePackage:
-			var v property.Package
+		case property2.TypePackage:
+			var v property2.Package
 			if err := json.Unmarshal(p.Value, &v); err != nil {
-				return nil, property.ParseError{Idx: i, Typ: p.Type, Err: err}
+				return nil, property2.ParseError{Idx: i, Typ: p.Type, Err: err}
 			}
-			p := property.MustBuildPackage(v.PackageName, v.Version)
+			p := property2.MustBuildPackage(v.PackageName, v.Version)
 			packageProvidedProperty = &p
 		default:
-			otherProps = append(otherProps, property.Property{
+			otherProps = append(otherProps, property2.Property{
 				Type:  p.Type,
 				Value: p.Value,
 			})
 		}
 	}
 
-	var packageRequiredProps []property.Property
+	var packageRequiredProps []property2.Property
 	for i, p := range b.Dependencies {
 		switch p.Type {
-		case property.TypeGVK:
-			var v property.GVK
+		case property2.TypeGVK:
+			var v property2.GVK
 			if err := json.Unmarshal(p.Value, &v); err != nil {
-				return nil, property.ParseError{Idx: i, Typ: p.Type, Err: err}
+				return nil, property2.ParseError{Idx: i, Typ: p.Type, Err: err}
 			}
-			k := property.GVKRequired{Group: v.Group, Kind: v.Kind, Version: v.Version}
+			k := property2.GVKRequired{Group: v.Group, Kind: v.Kind, Version: v.Version}
 			requiredGVKs[k] = struct{}{}
-		case property.TypePackage:
-			var v property.Package
+		case property2.TypePackage:
+			var v property2.Package
 			if err := json.Unmarshal(p.Value, &v); err != nil {
-				return nil, property.ParseError{Idx: i, Typ: p.Type, Err: err}
+				return nil, property2.ParseError{Idx: i, Typ: p.Type, Err: err}
 			}
-			packageRequiredProps = append(packageRequiredProps, property.MustBuildPackageRequired(v.PackageName, v.Version))
+			packageRequiredProps = append(packageRequiredProps, property2.MustBuildPackageRequired(v.PackageName, v.Version))
 		}
 	}
 
@@ -176,7 +176,7 @@ func PropertiesFromBundle(b *Bundle) ([]property.Property, error) {
 	}
 
 	for p := range providedApis {
-		k := property.GVK{Group: p.Group, Kind: p.Kind, Version: p.Version}
+		k := property2.GVK{Group: p.Group, Kind: p.Kind, Version: p.Version}
 		if _, ok := providedGVKs[k]; !ok {
 			providedGVKs[k] = struct{}{}
 		}
@@ -186,26 +186,26 @@ func PropertiesFromBundle(b *Bundle) ([]property.Property, error) {
 		return nil, fmt.Errorf("get required apis: %v", err)
 	}
 	for p := range requiredApis {
-		k := property.GVKRequired{Group: p.Group, Kind: p.Kind, Version: p.Version}
+		k := property2.GVKRequired{Group: p.Group, Kind: p.Kind, Version: p.Version}
 		if _, ok := requiredGVKs[k]; !ok {
 			requiredGVKs[k] = struct{}{}
 		}
 	}
 
-	var out []property.Property
+	var out []property2.Property
 	if packageProvidedProperty == nil {
-		p := property.MustBuildPackage(b.Package, version)
+		p := property2.MustBuildPackage(b.Package, version)
 		packageProvidedProperty = &p
 	}
 	out = append(out, *packageProvidedProperty)
 	out = append(out, graphProps...)
 
 	for p := range providedGVKs {
-		out = append(out, property.MustBuildGVK(p.Group, p.Version, p.Kind))
+		out = append(out, property2.MustBuildGVK(p.Group, p.Version, p.Kind))
 	}
 
 	for p := range requiredGVKs {
-		out = append(out, property.MustBuildGVKRequired(p.Group, p.Version, p.Kind))
+		out = append(out, property2.MustBuildGVKRequired(p.Group, p.Version, p.Kind))
 	}
 
 	out = append(out, packageRequiredProps...)
@@ -221,7 +221,7 @@ func PropertiesFromBundle(b *Bundle) ([]property.Property, error) {
 	return out, nil
 }
 
-func convertToModelRelatedImages(csv *ClusterServiceVersion) ([]model.RelatedImage, error) {
+func convertToModelRelatedImages(csv *ClusterServiceVersion) ([]model2.RelatedImage, error) {
 	var objmap map[string]*json.RawMessage
 	if err := json.Unmarshal(csv.Spec, &objmap); err != nil {
 		return nil, err
@@ -240,9 +240,9 @@ func convertToModelRelatedImages(csv *ClusterServiceVersion) ([]model.RelatedIma
 	if err := json.Unmarshal(*rawValue, &relatedImages); err != nil {
 		return nil, err
 	}
-	mrelatedImages := []model.RelatedImage{}
+	mrelatedImages := []model2.RelatedImage{}
 	for _, img := range relatedImages {
-		mrelatedImages = append(mrelatedImages, model.RelatedImage{Name: img.Name, Image: img.Ref})
+		mrelatedImages = append(mrelatedImages, model2.RelatedImage{Name: img.Name, Image: img.Ref})
 	}
 	return mrelatedImages, nil
 }

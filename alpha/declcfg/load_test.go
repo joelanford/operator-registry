@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/operator-framework/operator-registry/internal/property"
+	property2 "github.com/operator-framework/operator-registry/alpha/property"
 )
 
 func TestReadYAMLOrJSON(t *testing.T) {
@@ -115,7 +115,7 @@ func TestLoadDir(t *testing.T) {
 						Name:    "cockroachdb.v2.0.9",
 						Package: "cockroachdb",
 						Image:   "quay.io/openshift-community-operators/cockroachdb:v2.0.9",
-						Properties: []property.Property{
+						Properties: []property2.Property{
 							{Type: "olm.channel", Value: json.RawMessage(`{"name":"stable"}`)},
 							{Type: "olm.package", Value: json.RawMessage(`{"packageName":"cockroachdb","version":"2.0.9"}`)},
 						},
@@ -125,7 +125,7 @@ func TestLoadDir(t *testing.T) {
 						Name:    "cockroachdb.v2.1.11",
 						Package: "cockroachdb",
 						Image:   "quay.io/openshift-community-operators/cockroachdb:v2.1.11",
-						Properties: []property.Property{
+						Properties: []property2.Property{
 							{Type: "olm.channel", Value: json.RawMessage(`{"name":"stable","replaces":"cockroachdb.v2.1.1"}`)},
 							{Type: "olm.package", Value: json.RawMessage(`{"packageName":"cockroachdb","version":"2.1.11"}`)},
 						},
@@ -135,7 +135,7 @@ func TestLoadDir(t *testing.T) {
 						Name:    "cockroachdb.v2.1.1",
 						Package: "cockroachdb",
 						Image:   "quay.io/openshift-community-operators/cockroachdb:v2.1.1",
-						Properties: []property.Property{
+						Properties: []property2.Property{
 							{Type: "olm.channel", Value: json.RawMessage(`{"name":"stable","replaces":"cockroachdb.v2.0.9"}`)},
 							{Type: "olm.package", Value: json.RawMessage(`{"packageName":"cockroachdb","version":"2.1.1"}`)},
 						},
@@ -145,7 +145,7 @@ func TestLoadDir(t *testing.T) {
 						Name:    "cockroachdb.v3.0.7",
 						Package: "cockroachdb",
 						Image:   "quay.io/openshift-community-operators/cockroachdb:v3.0.7",
-						Properties: []property.Property{
+						Properties: []property2.Property{
 							{Type: "olm.channel", Value: json.RawMessage(`{"name":"stable-3.x"}`)},
 							{Type: "olm.package", Value: json.RawMessage(`{"packageName":"cockroachdb","version":"3.0.7"}`)},
 						},
@@ -155,7 +155,7 @@ func TestLoadDir(t *testing.T) {
 						Name:    "cockroachdb.v5.0.3",
 						Package: "cockroachdb",
 						Image:   "quay.io/openshift-community-operators/cockroachdb:v5.0.3",
-						Properties: []property.Property{
+						Properties: []property2.Property{
 							{Type: "olm.channel", Value: json.RawMessage(`{"name":"stable-5.x"}`)},
 							{Type: "olm.package", Value: json.RawMessage(`{"packageName":"cockroachdb","version":"5.0.3"}`)},
 						},
@@ -165,7 +165,7 @@ func TestLoadDir(t *testing.T) {
 						Name:    "etcdoperator-community.v0.6.1",
 						Package: "etcd",
 						Image:   "quay.io/operatorhubio/etcd:v0.6.1",
-						Properties: []property.Property{
+						Properties: []property2.Property{
 							{Type: "olm.package", Value: json.RawMessage(`{"packageName":"etcd","version":"0.6.1"}`)},
 							{Type: "olm.gvk", Value: json.RawMessage(`{"group":"etcd.database.coreos.com","kind":"EtcdCluster","version":"v1beta2"}`)},
 							{Type: "olm.channel", Value: json.RawMessage(`{"name":"alpha"}`)},
@@ -181,7 +181,7 @@ func TestLoadDir(t *testing.T) {
 						Name:    "etcdoperator.v0.9.0",
 						Package: "etcd",
 						Image:   "quay.io/operatorhubio/etcd:v0.9.0",
-						Properties: []property.Property{
+						Properties: []property2.Property{
 							{Type: "olm.package", Value: json.RawMessage(`{"packageName":"etcd","version":"0.9.0"}`)},
 							{Type: "olm.gvk", Value: json.RawMessage(`{"group":"etcd.database.coreos.com","kind":"EtcdBackup","version":"v1beta2"}`)},
 							{Type: "olm.channel", Value: json.RawMessage(`{"name":"singlenamespace-alpha"}`)},
@@ -194,7 +194,7 @@ func TestLoadDir(t *testing.T) {
 						Name:    "etcdoperator.v0.9.2",
 						Package: "etcd",
 						Image:   "quay.io/operatorhubio/etcd:v0.9.2",
-						Properties: []property.Property{
+						Properties: []property2.Property{
 							{Type: "olm.package", Value: json.RawMessage(`{"packageName":"etcd","version":"0.9.2"}`)},
 							{Type: "olm.gvk", Value: json.RawMessage(`{"group":"etcd.database.coreos.com","kind":"EtcdRestore","version":"v1beta2"}`)},
 							{Type: "olm.channel", Value: json.RawMessage(`{"name":"singlenamespace-alpha","replaces":"etcdoperator.v0.9.0"}`)},
@@ -206,7 +206,7 @@ func TestLoadDir(t *testing.T) {
 						Name:    "etcdoperator.v0.9.2-clusterwide",
 						Package: "etcd",
 						Image:   "quay.io/operatorhubio/etcd:v0.9.2-clusterwide",
-						Properties: []property.Property{
+						Properties: []property2.Property{
 							{Type: "olm.package", Value: json.RawMessage(`{"packageName":"etcd","version":"0.9.2-clusterwide"}`)},
 							{Type: "olm.gvk", Value: json.RawMessage(`{"group":"etcd.database.coreos.com","kind":"EtcdBackup","version":"v1beta2"}`)},
 							{Type: "olm.skipRange", Value: json.RawMessage(`">=0.9.0 <=0.9.1"`)},
@@ -221,7 +221,7 @@ func TestLoadDir(t *testing.T) {
 						Name:    "etcdoperator.v0.9.4",
 						Package: "etcd",
 						Image:   "quay.io/operatorhubio/etcd:v0.9.4",
-						Properties: []property.Property{
+						Properties: []property2.Property{
 							{Type: "olm.package", Value: json.RawMessage(`{"packageName":"etcd","version":"0.9.4"}`)},
 							{Type: "olm.package.required", Value: json.RawMessage(`{"packageName":"test","versionRange":">=1.2.3 <2.0.0-0"}`)},
 							{Type: "olm.gvk", Value: json.RawMessage(`{"group":"etcd.database.coreos.com","kind":"EtcdBackup","version":"v1beta2"}`)},
@@ -235,7 +235,7 @@ func TestLoadDir(t *testing.T) {
 						Name:    "etcdoperator.v0.9.4-clusterwide",
 						Package: "etcd",
 						Image:   "quay.io/operatorhubio/etcd:v0.9.4-clusterwide",
-						Properties: []property.Property{
+						Properties: []property2.Property{
 							{Type: "olm.package", Value: json.RawMessage(`{"packageName":"etcd","version":"0.9.4-clusterwide"}`)},
 							{Type: "olm.gvk", Value: json.RawMessage(`{"group":"etcd.database.coreos.com","kind":"EtcdBackup","version":"v1beta2"}`)},
 							{Type: "olm.channel", Value: json.RawMessage(`{"name":"clusterwide-alpha","replaces":"etcdoperator.v0.9.2-clusterwide"}`)},

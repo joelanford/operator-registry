@@ -8,8 +8,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/operator-framework/operator-registry/internal/action"
-	"github.com/operator-framework/operator-registry/internal/declcfg"
+	action2 "github.com/operator-framework/operator-registry/alpha/action"
+	declcfg2 "github.com/operator-framework/operator-registry/alpha/declcfg"
 )
 
 const (
@@ -19,26 +19,26 @@ const (
 func TestInit(t *testing.T) {
 	type spec struct {
 		name      string
-		init      action.Init
-		expectPkg *declcfg.Package
+		init      action2.Init
+		expectPkg *declcfg2.Package
 		assertion require.ErrorAssertionFunc
 	}
 
 	specs := []spec{
 		{
 			name: "Success/Empty",
-			init: action.Init{},
-			expectPkg: &declcfg.Package{
+			init: action2.Init{},
+			expectPkg: &declcfg2.Package{
 				Schema: "olm.package",
 			},
 			assertion: require.NoError,
 		},
 		{
 			name: "Success/SetPackage",
-			init: action.Init{
+			init: action2.Init{
 				Package: "foo",
 			},
-			expectPkg: &declcfg.Package{
+			expectPkg: &declcfg2.Package{
 				Schema: "olm.package",
 				Name:   "foo",
 			},
@@ -46,10 +46,10 @@ func TestInit(t *testing.T) {
 		},
 		{
 			name: "Success/SetDefaultChannel",
-			init: action.Init{
+			init: action2.Init{
 				DefaultChannel: "foo",
 			},
-			expectPkg: &declcfg.Package{
+			expectPkg: &declcfg2.Package{
 				Schema:         "olm.package",
 				DefaultChannel: "foo",
 			},
@@ -57,10 +57,10 @@ func TestInit(t *testing.T) {
 		},
 		{
 			name: "Success/SetDescription",
-			init: action.Init{
+			init: action2.Init{
 				DescriptionReader: bytes.NewBufferString("foo"),
 			},
-			expectPkg: &declcfg.Package{
+			expectPkg: &declcfg2.Package{
 				Schema:      "olm.package",
 				Description: "foo",
 			},
@@ -68,12 +68,12 @@ func TestInit(t *testing.T) {
 		},
 		{
 			name: "Success/SetIcon",
-			init: action.Init{
+			init: action2.Init{
 				IconReader: bytes.NewBufferString(svgIcon),
 			},
-			expectPkg: &declcfg.Package{
+			expectPkg: &declcfg2.Package{
 				Schema: "olm.package",
-				Icon: &declcfg.Icon{
+				Icon: &declcfg2.Icon{
 					Data:      bytes.NewBufferString(svgIcon).Bytes(),
 					MediaType: "image/svg+xml",
 				},
@@ -82,18 +82,18 @@ func TestInit(t *testing.T) {
 		},
 		{
 			name: "Success/SetAll",
-			init: action.Init{
+			init: action2.Init{
 				Package:           "a",
 				DefaultChannel:    "b",
 				DescriptionReader: bytes.NewBufferString("c"),
 				IconReader:        bytes.NewBufferString(svgIcon),
 			},
-			expectPkg: &declcfg.Package{
+			expectPkg: &declcfg2.Package{
 				Schema:         "olm.package",
 				Name:           "a",
 				DefaultChannel: "b",
 				Description:    "c",
-				Icon: &declcfg.Icon{
+				Icon: &declcfg2.Icon{
 					Data:      bytes.NewBufferString(svgIcon).Bytes(),
 					MediaType: "image/svg+xml",
 				},
@@ -102,28 +102,28 @@ func TestInit(t *testing.T) {
 		},
 		{
 			name: "Fail/ReadDescription",
-			init: action.Init{
+			init: action2.Init{
 				DescriptionReader: iotest.ErrReader(errors.New("fail")),
 			},
 			assertion: require.Error,
 		},
 		{
 			name: "Fail/ReadIcon",
-			init: action.Init{
+			init: action2.Init{
 				IconReader: iotest.ErrReader(errors.New("fail")),
 			},
 			assertion: require.Error,
 		},
 		{
 			name: "Fail/IconNotImage",
-			init: action.Init{
+			init: action2.Init{
 				IconReader: bytes.NewBufferString("foo"),
 			},
 			assertion: require.Error,
 		},
 		{
 			name: "Fail/EmptyIcon",
-			init: action.Init{
+			init: action2.Init{
 				IconReader: bytes.NewBuffer(nil),
 			},
 			assertion: require.Error,

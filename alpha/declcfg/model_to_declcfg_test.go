@@ -5,13 +5,13 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/operator-framework/operator-registry/internal/model"
+	model2 "github.com/operator-framework/operator-registry/alpha/model"
 )
 
 func TestConvertFromModel(t *testing.T) {
 	type spec struct {
 		name      string
-		m         model.Model
+		m         model2.Model
 		expectCfg DeclarativeConfig
 	}
 

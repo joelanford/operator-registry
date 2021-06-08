@@ -14,7 +14,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/util/yaml"
 
-	"github.com/operator-framework/operator-registry/internal/property"
+	property2 "github.com/operator-framework/operator-registry/alpha/property"
 )
 
 func LoadDir(configDir string) (*DeclarativeConfig, error) {
@@ -54,7 +54,7 @@ func loadFS(root string, w fsWalker) (*DeclarativeConfig, error) {
 
 func readBundleObjects(bundles []Bundle, root, path string) error {
 	for bi, b := range bundles {
-		props, err := property.Parse(b.Properties)
+		props, err := property2.Parse(b.Properties)
 		if err != nil {
 			return fmt.Errorf("parse properties for bundle %q: %v", b.Name, err)
 		}

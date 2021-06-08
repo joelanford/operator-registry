@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/operator-framework/operator-registry/internal/property"
+	property2 "github.com/operator-framework/operator-registry/alpha/property"
 )
 
 type validator interface {
@@ -42,14 +42,14 @@ func TestNormalize(t *testing.T) {
 	}
 	t.Run("Success/IgnoreInvalid", func(t *testing.T) {
 		invalidJSON := json.RawMessage(`}`)
-		b.Properties = []property.Property{{Value: invalidJSON}}
+		b.Properties = []property2.Property{{Value: invalidJSON}}
 		pkgs.Normalize()
 		assert.Equal(t, invalidJSON, b.Properties[0].Value)
 	})
 
 	t.Run("Success/Unchanged", func(t *testing.T) {
 		unchanged := json.RawMessage(`{}`)
-		b.Properties = []property.Property{{Value: unchanged}}
+		b.Properties = []property2.Property{{Value: unchanged}}
 		pkgs.Normalize()
 		assert.Equal(t, unchanged, b.Properties[0].Value)
 	})
@@ -60,7 +60,7 @@ func TestNormalize(t *testing.T) {
   
   }  `)
 		expected := json.RawMessage(`{"foo":"bar"}`)
-		b.Properties = []property.Property{{Value: withWhitespace}}
+		b.Properties = []property2.Property{{Value: withWhitespace}}
 		pkgs.Normalize()
 		assert.Equal(t, expected, b.Properties[0].Value)
 	})
@@ -368,12 +368,12 @@ func TestValidators(t *testing.T) {
 				Image:    "registry.io/image",
 				Replaces: "anakin.v0.0.1",
 				Skips:    []string{"anakin.v0.0.2"},
-				Properties: []property.Property{
-					property.MustBuildPackage("anakin", "0.1.0"),
-					property.MustBuildGVK("skywalker.me", "v1alpha1", "PodRacer"),
-					property.MustBuildSkips("anakin.v0.0.2"),
-					property.MustBuildChannel("light", "anakin.v0.0.1"),
-					property.MustBuildChannel("dark", "anakin.v0.0.1"),
+				Properties: []property2.Property{
+					property2.MustBuildPackage("anakin", "0.1.0"),
+					property2.MustBuildGVK("skywalker.me", "v1alpha1", "PodRacer"),
+					property2.MustBuildSkips("anakin.v0.0.2"),
+					property2.MustBuildChannel("light", "anakin.v0.0.1"),
+					property2.MustBuildChannel("dark", "anakin.v0.0.1"),
 				},
 			},
 			assertion: require.NoError,
@@ -385,11 +385,11 @@ func TestValidators(t *testing.T) {
 				Channel: ch,
 				Name:    "anakin.v0.1.0",
 				Image:   "",
-				Properties: []property.Property{
-					property.MustBuildPackage("anakin", "0.1.0"),
-					property.MustBuildGVK("skywalker.me", "v1alpha1", "PodRacer"),
-					property.MustBuildChannel("light", "anakin.v0.0.1"),
-					property.MustBuildBundleObjectRef("path/to/data"),
+				Properties: []property2.Property{
+					property2.MustBuildPackage("anakin", "0.1.0"),
+					property2.MustBuildGVK("skywalker.me", "v1alpha1", "PodRacer"),
+					property2.MustBuildChannel("light", "anakin.v0.0.1"),
+					property2.MustBuildBundleObjectRef("path/to/data"),
 				},
 				Objects: []string{"testdata"},
 				CsvJSON: "CSVjson",
@@ -403,10 +403,10 @@ func TestValidators(t *testing.T) {
 				Channel: ch,
 				Name:    "anakin.v0.1.0",
 				Image:   "",
-				Properties: []property.Property{
-					property.MustBuildPackage("anakin", "0.1.0"),
-					property.MustBuildGVK("skywalker.me", "v1alpha1", "PodRacer"),
-					property.MustBuildChannel("light", "anakin.v0.0.1"),
+				Properties: []property2.Property{
+					property2.MustBuildPackage("anakin", "0.1.0"),
+					property2.MustBuildGVK("skywalker.me", "v1alpha1", "PodRacer"),
+					property2.MustBuildChannel("light", "anakin.v0.0.1"),
 				},
 			},
 			assertion: require.Error,
@@ -457,7 +457,7 @@ func TestValidators(t *testing.T) {
 				Channel:    ch,
 				Name:       "anakin.v0.1.0",
 				Replaces:   "anakin.v0.0.1",
-				Properties: []property.Property{{Value: json.RawMessage("")}},
+				Properties: []property2.Property{{Value: json.RawMessage("")}},
 			},
 			assertion: require.Error,
 		},
@@ -468,7 +468,7 @@ func TestValidators(t *testing.T) {
 				Channel:    ch,
 				Name:       "anakin.v0.1.0",
 				Replaces:   "anakin.v0.0.1",
-				Properties: []property.Property{{Type: "custom", Value: json.RawMessage("{}")}},
+				Properties: []property2.Property{{Type: "custom", Value: json.RawMessage("{}")}},
 				Skips:      []string{""},
 			},
 			assertion: require.Error,
@@ -480,7 +480,7 @@ func TestValidators(t *testing.T) {
 				Channel:    ch,
 				Name:       "anakin.v0.1.0",
 				Replaces:   "anakin.v0.0.1",
-				Properties: []property.Property{{Type: "custom", Value: json.RawMessage("{}")}},
+				Properties: []property2.Property{{Type: "custom", Value: json.RawMessage("{}")}},
 				Skips:      []string{"foobar"},
 			},
 			assertion: require.Error,
@@ -494,10 +494,10 @@ func TestValidators(t *testing.T) {
 				Image:    "",
 				Replaces: "anakin.v0.0.1",
 				Skips:    []string{"anakin.v0.0.2"},
-				Properties: []property.Property{
-					property.MustBuildSkips("anakin.v0.0.2"),
-					property.MustBuildChannel("light", "anakin.v0.0.1"),
-					property.MustBuildChannel("dark", "anakin.v0.0.1"),
+				Properties: []property2.Property{
+					property2.MustBuildSkips("anakin.v0.0.2"),
+					property2.MustBuildChannel("light", "anakin.v0.0.1"),
+					property2.MustBuildChannel("dark", "anakin.v0.0.1"),
 				},
 			},
 			assertion: require.Error,
@@ -511,12 +511,12 @@ func TestValidators(t *testing.T) {
 				Image:    "",
 				Replaces: "anakin.v0.0.1",
 				Skips:    []string{"anakin.v0.0.2"},
-				Properties: []property.Property{
-					property.MustBuildPackage("anakin", "0.1.0"),
-					property.MustBuildPackage("anakin", "0.2.0"),
-					property.MustBuildSkips("anakin.v0.0.2"),
-					property.MustBuildChannel("light", "anakin.v0.0.1"),
-					property.MustBuildChannel("dark", "anakin.v0.0.1"),
+				Properties: []property2.Property{
+					property2.MustBuildPackage("anakin", "0.1.0"),
+					property2.MustBuildPackage("anakin", "0.2.0"),
+					property2.MustBuildSkips("anakin.v0.0.2"),
+					property2.MustBuildChannel("light", "anakin.v0.0.1"),
+					property2.MustBuildChannel("dark", "anakin.v0.0.1"),
 				},
 			},
 			assertion: require.Error,
@@ -557,18 +557,18 @@ func makePackageChannelBundle() (*Package, *Channel) {
 	bundle1 := &Bundle{
 		Name:  "anakin.v0.0.1",
 		Image: "anakin-operator:v0.0.1",
-		Properties: []property.Property{
-			property.MustBuildPackage("anakin", "0.0.1"),
-			property.MustBuildGVK("skywalker.me", "v1alpha1", "PodRacer"),
+		Properties: []property2.Property{
+			property2.MustBuildPackage("anakin", "0.0.1"),
+			property2.MustBuildGVK("skywalker.me", "v1alpha1", "PodRacer"),
 		},
 	}
 	bundle2 := &Bundle{
 		Name:     "anakin.v0.0.2",
 		Image:    "anakin-operator:v0.0.2",
 		Replaces: "anakin.v0.0.1",
-		Properties: []property.Property{
-			property.MustBuildPackage("anakin", "0.0.2"),
-			property.MustBuildGVK("skywalker.me", "v1alpha1", "PodRacer"),
+		Properties: []property2.Property{
+			property2.MustBuildPackage("anakin", "0.0.2"),
+			property2.MustBuildGVK("skywalker.me", "v1alpha1", "PodRacer"),
 		},
 	}
 	ch := &Channel{

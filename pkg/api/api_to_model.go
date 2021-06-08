@@ -5,11 +5,11 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/operator-framework/operator-registry/internal/model"
-	"github.com/operator-framework/operator-registry/internal/property"
+	model2 "github.com/operator-framework/operator-registry/alpha/model"
+	property2 "github.com/operator-framework/operator-registry/alpha/property"
 )
 
-func ConvertAPIBundleToModelBundle(b *Bundle) (*model.Bundle, error) {
+func ConvertAPIBundleToModelBundle(b *Bundle) (*model2.Bundle, error) {
 	bundleProps, err := convertAPIBundleToModelProperties(b)
 	if err != nil {
 		return nil, fmt.Errorf("convert properties: %v", err)
@@ -20,7 +20,7 @@ func ConvertAPIBundleToModelBundle(b *Bundle) (*model.Bundle, error) {
 		return nil, fmt.Errorf("get related iamges: %v", err)
 	}
 
-	return &model.Bundle{
+	return &model2.Bundle{
 		Name:          b.CsvName,
 		Image:         b.BundlePath,
 		Replaces:      b.Replaces,
@@ -32,40 +32,40 @@ func ConvertAPIBundleToModelBundle(b *Bundle) (*model.Bundle, error) {
 	}, nil
 }
 
-func convertAPIBundleToModelProperties(b *Bundle) ([]property.Property, error) {
-	var out []property.Property
+func convertAPIBundleToModelProperties(b *Bundle) ([]property2.Property, error) {
+	var out []property2.Property
 
 	for _, skip := range b.Skips {
-		out = append(out, property.MustBuildSkips(skip))
+		out = append(out, property2.MustBuildSkips(skip))
 	}
 
 	if b.SkipRange != "" {
-		out = append(out, property.MustBuildSkipRange(b.SkipRange))
+		out = append(out, property2.MustBuildSkipRange(b.SkipRange))
 	}
 
-	out = append(out, property.MustBuildChannel(b.ChannelName, b.Replaces))
+	out = append(out, property2.MustBuildChannel(b.ChannelName, b.Replaces))
 
-	providedGVKs := map[property.GVK]struct{}{}
-	requiredGVKs := map[property.GVKRequired]struct{}{}
+	providedGVKs := map[property2.GVK]struct{}{}
+	requiredGVKs := map[property2.GVKRequired]struct{}{}
 
 	foundPackageProperty := false
 	for i, p := range b.Properties {
 		switch p.Type {
-		case property.TypeGVK:
+		case property2.TypeGVK:
 			var v GroupVersionKind
 			if err := json.Unmarshal(json.RawMessage(p.Value), &v); err != nil {
-				return nil, property.ParseError{Idx: i, Typ: p.Type, Err: err}
+				return nil, property2.ParseError{Idx: i, Typ: p.Type, Err: err}
 			}
-			k := property.GVK{Group: v.Group, Kind: v.Kind, Version: v.Version}
+			k := property2.GVK{Group: v.Group, Kind: v.Kind, Version: v.Version}
 			providedGVKs[k] = struct{}{}
-		case property.TypePackage:
+		case property2.TypePackage:
 			foundPackageProperty = true
-			out = append(out, property.Property{
-				Type:  property.TypePackage,
+			out = append(out, property2.Property{
+				Type:  property2.TypePackage,
 				Value: json.RawMessage(p.Value),
 			})
 		default:
-			out = append(out, property.Property{
+			out = append(out, property2.Property{
 				Type:  p.Type,
 				Value: json.RawMessage(p.Value),
 			})
@@ -74,49 +74,49 @@ func convertAPIBundleToModelProperties(b *Bundle) ([]property.Property, error) {
 
 	for i, p := range b.Dependencies {
 		switch p.Type {
-		case property.TypeGVK:
+		case property2.TypeGVK:
 			var v GroupVersionKind
 			if err := json.Unmarshal(json.RawMessage(p.Value), &v); err != nil {
-				return nil, property.ParseError{Idx: i, Typ: p.Type, Err: err}
+				return nil, property2.ParseError{Idx: i, Typ: p.Type, Err: err}
 			}
-			k := property.GVKRequired{Group: v.Group, Kind: v.Kind, Version: v.Version}
+			k := property2.GVKRequired{Group: v.Group, Kind: v.Kind, Version: v.Version}
 			requiredGVKs[k] = struct{}{}
-		case property.TypePackage:
-			var v property.Package
+		case property2.TypePackage:
+			var v property2.Package
 			if err := json.Unmarshal(json.RawMessage(p.Value), &v); err != nil {
-				return nil, property.ParseError{Idx: i, Typ: p.Type, Err: err}
+				return nil, property2.ParseError{Idx: i, Typ: p.Type, Err: err}
 			}
-			out = append(out, property.MustBuildPackageRequired(v.PackageName, v.Version))
+			out = append(out, property2.MustBuildPackageRequired(v.PackageName, v.Version))
 		}
 	}
 
 	if !foundPackageProperty {
-		out = append(out, property.MustBuildPackage(b.PackageName, b.Version))
+		out = append(out, property2.MustBuildPackage(b.PackageName, b.Version))
 	}
 
 	for _, p := range b.ProvidedApis {
-		k := property.GVK{Group: p.Group, Kind: p.Kind, Version: p.Version}
+		k := property2.GVK{Group: p.Group, Kind: p.Kind, Version: p.Version}
 		if _, ok := providedGVKs[k]; !ok {
 			providedGVKs[k] = struct{}{}
 		}
 	}
 	for _, p := range b.RequiredApis {
-		k := property.GVKRequired{Group: p.Group, Kind: p.Kind, Version: p.Version}
+		k := property2.GVKRequired{Group: p.Group, Kind: p.Kind, Version: p.Version}
 		if _, ok := requiredGVKs[k]; !ok {
 			requiredGVKs[k] = struct{}{}
 		}
 	}
 
 	for p := range providedGVKs {
-		out = append(out, property.MustBuildGVK(p.Group, p.Version, p.Kind))
+		out = append(out, property2.MustBuildGVK(p.Group, p.Version, p.Kind))
 	}
 
 	for p := range requiredGVKs {
-		out = append(out, property.MustBuildGVKRequired(p.Group, p.Version, p.Kind))
+		out = append(out, property2.MustBuildGVKRequired(p.Group, p.Version, p.Kind))
 	}
 
 	for _, obj := range b.Object {
-		out = append(out, property.MustBuildBundleObjectData([]byte(obj)))
+		out = append(out, property2.MustBuildBundleObjectData([]byte(obj)))
 	}
 
 	sort.Slice(out, func(i, j int) bool {
@@ -129,7 +129,7 @@ func convertAPIBundleToModelProperties(b *Bundle) ([]property.Property, error) {
 	return out, nil
 }
 
-func getRelatedImages(csvJSON string) ([]model.RelatedImage, error) {
+func getRelatedImages(csvJSON string) ([]model2.RelatedImage, error) {
 	if len(csvJSON) == 0 {
 		return nil, nil
 	}
@@ -145,9 +145,9 @@ func getRelatedImages(csvJSON string) ([]model.RelatedImage, error) {
 	if err := json.Unmarshal([]byte(csvJSON), &c); err != nil {
 		return nil, fmt.Errorf("unmarshal csv: %v", err)
 	}
-	relatedImages := []model.RelatedImage{}
+	relatedImages := []model2.RelatedImage{}
 	for _, ri := range c.Spec.RelatedImages {
-		relatedImages = append(relatedImages, model.RelatedImage(ri))
+		relatedImages = append(relatedImages, model2.RelatedImage(ri))
 	}
 	return relatedImages, nil
 }

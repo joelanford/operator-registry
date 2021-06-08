@@ -6,8 +6,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/operator-framework/operator-registry/internal/model"
-	"github.com/operator-framework/operator-registry/internal/property"
+	model2 "github.com/operator-framework/operator-registry/alpha/model"
+	property2 "github.com/operator-framework/operator-registry/alpha/property"
 	"github.com/operator-framework/operator-registry/pkg/image"
 )
 
@@ -24,22 +24,22 @@ func TestConvertRegistryBundleToModelBundle(t *testing.T) {
 	assert.Equal(t, len(registryBundles), 2)
 }
 
-func testModelBundle() model.Bundle {
-	b := model.Bundle{
+func testModelBundle() model2.Bundle {
+	b := model2.Bundle{
 		Name:     "etcdoperator.v0.9.2",
 		Image:    "quay.io/operatorhubio/etcd:v0.9.2",
 		Replaces: "etcdoperator.v0.9.0",
 		Skips:    []string{"etcdoperator.v0.9.1"},
-		Properties: []property.Property{
-			property.MustBuildChannel("alpha", "etcdoperator.v0.9.0"),
-			property.MustBuildChannel("stable", "etcdoperator.v0.9.0"),
-			property.MustBuildPackage("etcd", "0.9.2"),
-			property.MustBuildSkips("etcdoperator.v0.9.1"),
-			property.MustBuildGVKRequired("etcd.database.coreos.com", "v1beta2", "EtcdCluster"),
-			property.MustBuildGVKRequired("testapi.coreos.com", "v1", "testapi"),
-			property.MustBuildGVK("etcd.database.coreos.com", "v1beta2", "EtcdCluster"),
-			property.MustBuildGVK("etcd.database.coreos.com", "v1beta2", "EtcdBackup"),
-			property.MustBuildGVK("etcd.database.coreos.com", "v1beta2", "EtcdRestore"),
+		Properties: []property2.Property{
+			property2.MustBuildChannel("alpha", "etcdoperator.v0.9.0"),
+			property2.MustBuildChannel("stable", "etcdoperator.v0.9.0"),
+			property2.MustBuildPackage("etcd", "0.9.2"),
+			property2.MustBuildSkips("etcdoperator.v0.9.1"),
+			property2.MustBuildGVKRequired("etcd.database.coreos.com", "v1beta2", "EtcdCluster"),
+			property2.MustBuildGVKRequired("testapi.coreos.com", "v1", "testapi"),
+			property2.MustBuildGVK("etcd.database.coreos.com", "v1beta2", "EtcdCluster"),
+			property2.MustBuildGVK("etcd.database.coreos.com", "v1beta2", "EtcdBackup"),
+			property2.MustBuildGVK("etcd.database.coreos.com", "v1beta2", "EtcdRestore"),
 		},
 	}
 	return b
@@ -53,7 +53,7 @@ func testRegistryBundle() (*Bundle, error) {
 	return input.Bundle, nil
 }
 
-func assertEqualsModelBundle(t *testing.T, a, b model.Bundle) bool {
+func assertEqualsModelBundle(t *testing.T, a, b model2.Bundle) bool {
 	assert.ElementsMatch(t, a.Properties, b.Properties)
 	assert.ElementsMatch(t, a.Skips, b.Skips)
 	assert.ElementsMatch(t, a.RelatedImages, b.RelatedImages)

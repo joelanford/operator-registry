@@ -6,7 +6,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/operator-framework/operator-registry/internal/declcfg"
+	declcfg2 "github.com/operator-framework/operator-registry/alpha/declcfg"
 )
 
 var testModelQuerier = genTestModelQuerier()
@@ -174,11 +174,11 @@ func TestQuerier_ListPackages(t *testing.T) {
 }
 
 func genTestModelQuerier() *Querier {
-	cfg, err := declcfg.LoadDir("testdata/validDeclCfg")
+	cfg, err := declcfg2.LoadDir("testdata/validDeclCfg")
 	if err != nil {
 		panic(err)
 	}
-	m, err := declcfg.ConvertToModel(*cfg)
+	m, err := declcfg2.ConvertToModel(*cfg)
 	if err != nil {
 		panic(err)
 	}

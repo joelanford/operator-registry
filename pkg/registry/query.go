@@ -5,17 +5,17 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/operator-framework/operator-registry/internal/model"
+	model2 "github.com/operator-framework/operator-registry/alpha/model"
 	"github.com/operator-framework/operator-registry/pkg/api"
 )
 
 type Querier struct {
-	pkgs model.Model
+	pkgs model2.Model
 }
 
 var _ GRPCQuery = &Querier{}
 
-func NewQuerier(packages model.Model) *Querier {
+func NewQuerier(packages model2.Model) *Querier {
 	return &Querier{
 		pkgs: packages,
 	}
@@ -251,7 +251,7 @@ func (q Querier) GetBundleThatProvides(ctx context.Context, group, version, kind
 	return nil, fmt.Errorf("no entry found that provides group:%q version:%q kind:%q", group, version, kind)
 }
 
-func doesModelBundleProvide(b model.Bundle, group, version, kind string) (bool, error) {
+func doesModelBundleProvide(b model2.Bundle, group, version, kind string) (bool, error) {
 	apiBundle, err := api.ConvertModelBundleToAPIBundle(b)
 	if err != nil {
 		return false, fmt.Errorf("convert bundle %q: %v", b.Name, err)
@@ -264,7 +264,7 @@ func doesModelBundleProvide(b model.Bundle, group, version, kind string) (bool, 
 	return false, nil
 }
 
-func bundleReplaces(b model.Bundle, name string) bool {
+func bundleReplaces(b model2.Bundle, name string) bool {
 	if b.Replaces == name {
 		return true
 	}
@@ -276,7 +276,7 @@ func bundleReplaces(b model.Bundle, name string) bool {
 	return false
 }
 
-func channelEntriesThatReplace(b model.Bundle, name string) []*ChannelEntry {
+func channelEntriesThatReplace(b model2.Bundle, name string) []*ChannelEntry {
 	var entries []*ChannelEntry
 	if b.Replaces == name {
 		entries = append(entries, &ChannelEntry{
@@ -299,7 +299,7 @@ func channelEntriesThatReplace(b model.Bundle, name string) []*ChannelEntry {
 	return entries
 }
 
-func channelEntriesForBundle(b model.Bundle, ignoreChannel bool) []*ChannelEntry {
+func channelEntriesForBundle(b model2.Bundle, ignoreChannel bool) []*ChannelEntry {
 	entries := []*ChannelEntry{{
 		PackageName: b.Package.Name,
 		ChannelName: b.Channel.Name,

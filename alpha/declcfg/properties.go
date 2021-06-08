@@ -3,11 +3,11 @@ package declcfg
 import (
 	"fmt"
 
-	"github.com/operator-framework/operator-registry/internal/property"
+	property2 "github.com/operator-framework/operator-registry/alpha/property"
 )
 
-func parseProperties(props []property.Property) (*property.Properties, error) {
-	out, err := property.Parse(props)
+func parseProperties(props []property2.Property) (*property2.Properties, error) {
+	out, err := property2.Parse(props)
 	if err != nil {
 		return nil, err
 	}
@@ -15,7 +15,7 @@ func parseProperties(props []property.Property) (*property.Properties, error) {
 	channels := map[string]struct{}{}
 	for _, ch := range out.Channels {
 		if _, ok := channels[ch.Name]; ok {
-			return nil, propertyDuplicateError{typ: property.TypeChannel, key: ch.Name}
+			return nil, propertyDuplicateError{typ: property2.TypeChannel, key: ch.Name}
 		}
 		channels[ch.Name] = struct{}{}
 	}

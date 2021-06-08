@@ -7,7 +7,7 @@ import (
 
 	"github.com/h2non/filetype"
 
-	"github.com/operator-framework/operator-registry/internal/declcfg"
+	declcfg2 "github.com/operator-framework/operator-registry/alpha/declcfg"
 )
 
 type Init struct {
@@ -17,8 +17,8 @@ type Init struct {
 	IconReader        io.Reader
 }
 
-func (i Init) Run() (*declcfg.Package, error) {
-	pkg := &declcfg.Package{
+func (i Init) Run() (*declcfg2.Package, error) {
+	pkg := &declcfg2.Package{
 		// TODO(joelanford): Use a constant for "olm.package"
 		Schema:         "olm.package",
 		Name:           i.Package,
@@ -44,7 +44,7 @@ func (i Init) Run() (*declcfg.Package, error) {
 		if iconType.MIME.Type != "image" {
 			return nil, fmt.Errorf("detected invalid type %q: not an image", iconType.MIME.Value)
 		}
-		pkg.Icon = &declcfg.Icon{
+		pkg.Icon = &declcfg2.Icon{
 			Data:      iconData,
 			MediaType: iconType.MIME.Value,
 		}

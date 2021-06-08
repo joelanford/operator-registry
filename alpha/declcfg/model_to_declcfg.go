@@ -3,11 +3,11 @@ package declcfg
 import (
 	"sort"
 
-	"github.com/operator-framework/operator-registry/internal/model"
-	"github.com/operator-framework/operator-registry/internal/property"
+	model2 "github.com/operator-framework/operator-registry/alpha/model"
+	property2 "github.com/operator-framework/operator-registry/alpha/property"
 )
 
-func ConvertFromModel(mpkgs model.Model) DeclarativeConfig {
+func ConvertFromModel(mpkgs model2.Model) DeclarativeConfig {
 	cfg := DeclarativeConfig{}
 	for _, mpkg := range mpkgs {
 		bundles := traverseModelChannels(*mpkg)
@@ -43,7 +43,7 @@ func ConvertFromModel(mpkgs model.Model) DeclarativeConfig {
 	return cfg
 }
 
-func traverseModelChannels(mpkg model.Package) []Bundle {
+func traverseModelChannels(mpkg model2.Package) []Bundle {
 	bundles := map[string]*Bundle{}
 
 	for _, ch := range mpkg.Channels {
@@ -67,13 +67,13 @@ func traverseModelChannels(mpkg model.Package) []Bundle {
 
 	var out []Bundle
 	for _, b := range bundles {
-		b.Properties = property.Deduplicate(b.Properties)
+		b.Properties = property2.Deduplicate(b.Properties)
 		out = append(out, *b)
 	}
 	return out
 }
 
-func modelRelatedImagesToRelatedImages(relatedImages []model.RelatedImage) []RelatedImage {
+func modelRelatedImagesToRelatedImages(relatedImages []model2.RelatedImage) []RelatedImage {
 	var out []RelatedImage
 	for _, ri := range relatedImages {
 		out = append(out, RelatedImage{

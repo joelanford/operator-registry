@@ -4,11 +4,11 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/operator-framework/operator-registry/internal/model"
-	"github.com/operator-framework/operator-registry/internal/property"
+	model2 "github.com/operator-framework/operator-registry/alpha/model"
+	property2 "github.com/operator-framework/operator-registry/alpha/property"
 )
 
-func ConvertModelBundleToAPIBundle(b model.Bundle) (*Bundle, error) {
+func ConvertModelBundleToAPIBundle(b model2.Bundle) (*Bundle, error) {
 	props, err := parseProperties(b.Properties)
 	if err != nil {
 		return nil, fmt.Errorf("parse properties: %v", err)
@@ -40,24 +40,24 @@ func ConvertModelBundleToAPIBundle(b model.Bundle) (*Bundle, error) {
 	}, nil
 }
 
-func parseProperties(in []property.Property) (*property.Properties, error) {
-	props, err := property.Parse(in)
+func parseProperties(in []property2.Property) (*property2.Properties, error) {
+	props, err := property2.Parse(in)
 	if err != nil {
 		return nil, err
 	}
 
 	if len(props.Packages) != 1 {
-		return nil, fmt.Errorf("expected exactly 1 property of type %q, found %d", property.TypePackage, len(props.Packages))
+		return nil, fmt.Errorf("expected exactly 1 property of type %q, found %d", property2.TypePackage, len(props.Packages))
 	}
 
 	if len(props.SkipRanges) > 1 {
-		return nil, fmt.Errorf("multiple properties of type %q not allowed", property.TypeSkipRange)
+		return nil, fmt.Errorf("multiple properties of type %q not allowed", property2.TypeSkipRange)
 	}
 
 	return props, nil
 }
 
-func gvksProvidedtoAPIGVKs(in []property.GVK) []*GroupVersionKind {
+func gvksProvidedtoAPIGVKs(in []property2.GVK) []*GroupVersionKind {
 	var out []*GroupVersionKind
 	for _, gvk := range in {
 		out = append(out, &GroupVersionKind{
@@ -68,7 +68,7 @@ func gvksProvidedtoAPIGVKs(in []property.GVK) []*GroupVersionKind {
 	}
 	return out
 }
-func gvksRequirestoAPIGVKs(in []property.GVKRequired) []*GroupVersionKind {
+func gvksRequirestoAPIGVKs(in []property2.GVKRequired) []*GroupVersionKind {
 	var out []*GroupVersionKind
 	for _, gvk := range in {
 		out = append(out, &GroupVersionKind{
@@ -80,7 +80,7 @@ func gvksRequirestoAPIGVKs(in []property.GVKRequired) []*GroupVersionKind {
 	return out
 }
 
-func convertModelPropertiesToAPIProperties(props []property.Property) []*Property {
+func convertModelPropertiesToAPIProperties(props []property2.Property) []*Property {
 	var out []*Property
 	for _, prop := range props {
 
@@ -90,7 +90,7 @@ func convertModelPropertiesToAPIProperties(props []property.Property) []*Propert
 		//       in its `Data` field, this CSV annotation projection would cause the size of the on-cluster
 		//       CSV to at least double, which is untenable since CSVs already have known issues running up
 		//       against etcd size constraints.
-		if prop.Type == property.TypeBundleObject {
+		if prop.Type == property2.TypeBundleObject {
 			continue
 		}
 
@@ -102,21 +102,21 @@ func convertModelPropertiesToAPIProperties(props []property.Property) []*Propert
 	return out
 }
 
-func convertModelPropertiesToAPIDependencies(props []property.Property) ([]*Dependency, error) {
+func convertModelPropertiesToAPIDependencies(props []property2.Property) ([]*Dependency, error) {
 	var out []*Dependency
 	for _, prop := range props {
 		switch prop.Type {
-		case property.TypeGVKRequired:
+		case property2.TypeGVKRequired:
 			out = append(out, &Dependency{
-				Type:  property.TypeGVK,
+				Type:  property2.TypeGVK,
 				Value: string(prop.Value),
 			})
-		case property.TypePackageRequired:
-			var v property.PackageRequired
+		case property2.TypePackageRequired:
+			var v property2.PackageRequired
 			if err := json.Unmarshal(prop.Value, &v); err != nil {
 				return nil, err
 			}
-			pkg := property.MustBuildPackage(v.PackageName, v.VersionRange)
+			pkg := property2.MustBuildPackage(v.PackageName, v.VersionRange)
 			out = append(out, &Dependency{
 				Type:  pkg.Type,
 				Value: string(pkg.Value),

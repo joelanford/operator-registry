@@ -7,13 +7,13 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
-	"github.com/operator-framework/operator-registry/internal/action"
-	"github.com/operator-framework/operator-registry/internal/declcfg"
+	action2 "github.com/operator-framework/operator-registry/alpha/action"
+	declcfg2 "github.com/operator-framework/operator-registry/alpha/declcfg"
 )
 
 func NewCmd() *cobra.Command {
 	var (
-		init            action.Init
+		init            action2.Init
 		iconFile        string
 		descriptionFile string
 		output          string
@@ -25,12 +25,12 @@ func NewCmd() *cobra.Command {
 		Run: func(cmd *cobra.Command, args []string) {
 			init.Package = args[0]
 
-			var write func(declcfg.DeclarativeConfig, io.Writer) error
+			var write func(declcfg2.DeclarativeConfig, io.Writer) error
 			switch output {
 			case "yaml":
-				write = declcfg.WriteYAML
+				write = declcfg2.WriteYAML
 			case "json":
-				write = declcfg.WriteJSON
+				write = declcfg2.WriteJSON
 			default:
 				log.Fatalf("invalid --output value %q, expected (json|yaml)", output)
 			}
@@ -57,7 +57,7 @@ func NewCmd() *cobra.Command {
 			if err != nil {
 				log.Fatal(err)
 			}
-			cfg := declcfg.DeclarativeConfig{Packages: []declcfg.Package{*pkg}}
+			cfg := declcfg2.DeclarativeConfig{Packages: []declcfg2.Package{*pkg}}
 			if err := write(cfg, os.Stdout); err != nil {
 				log.Fatal(err)
 			}

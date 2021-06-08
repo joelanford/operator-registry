@@ -11,7 +11,7 @@ import (
 	svg "github.com/h2non/go-is-svg"
 	"github.com/hashicorp/go-multierror"
 
-	"github.com/operator-framework/operator-registry/internal/property"
+	property2 "github.com/operator-framework/operator-registry/alpha/property"
 )
 
 func init() {
@@ -206,7 +206,7 @@ type Bundle struct {
 	Image         string
 	Replaces      string
 	Skips         []string
-	Properties    []property.Property
+	Properties    []property2.Property
 	RelatedImages []RelatedImage
 
 	// These fields are present so that we can continue serving
@@ -237,7 +237,7 @@ func (b *Bundle) Validate() error {
 			}
 		}
 	}
-	props, err := property.Parse(b.Properties)
+	props, err := property2.Parse(b.Properties)
 	if err != nil {
 		result = multierror.Append(result, err)
 	}
@@ -257,7 +257,7 @@ func (b *Bundle) Validate() error {
 	//}
 
 	if props != nil && len(props.Packages) != 1 {
-		result = multierror.Append(result, fmt.Errorf("must be exactly one property with type %q", property.TypePackage))
+		result = multierror.Append(result, fmt.Errorf("must be exactly one property with type %q", property2.TypePackage))
 	}
 
 	if b.Image == "" && len(b.Objects) == 0 {
@@ -289,7 +289,7 @@ func (m Model) Normalize() {
 			for _, b := range ch.Bundles {
 				for i := range b.Properties {
 					// Ensure property value is encoded in a standard way.
-					if normalized, err := property.Build(&b.Properties[i]); err == nil {
+					if normalized, err := property2.Build(&b.Properties[i]); err == nil {
 						b.Properties[i] = *normalized
 					}
 				}

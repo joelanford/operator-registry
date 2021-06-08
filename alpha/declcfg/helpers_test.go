@@ -10,8 +10,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/operator-framework/operator-registry/internal/model"
-	"github.com/operator-framework/operator-registry/internal/property"
+	model2 "github.com/operator-framework/operator-registry/alpha/model"
+	property2 "github.com/operator-framework/operator-registry/alpha/property"
 )
 
 func buildValidDeclarativeConfig(includeUnrecognized bool) DeclarativeConfig {
@@ -69,19 +69,19 @@ type bundleOpt func(*Bundle)
 
 func withChannel(name, replaces string) func(*Bundle) {
 	return func(b *Bundle) {
-		b.Properties = append(b.Properties, property.MustBuildChannel(name, replaces))
+		b.Properties = append(b.Properties, property2.MustBuildChannel(name, replaces))
 	}
 }
 
 func withSkips(name string) func(*Bundle) {
 	return func(b *Bundle) {
-		b.Properties = append(b.Properties, property.MustBuildSkips(name))
+		b.Properties = append(b.Properties, property2.MustBuildSkips(name))
 	}
 }
 
 func withNoProperties() func(*Bundle) {
 	return func(b *Bundle) {
-		b.Properties = []property.Property{}
+		b.Properties = []property2.Property{}
 	}
 }
 
@@ -105,10 +105,10 @@ func newTestBundle(packageName, version string, opts ...bundleOpt) Bundle {
 		Name:    testBundleName(packageName, version),
 		Package: packageName,
 		Image:   testBundleImage(packageName, version),
-		Properties: []property.Property{
-			property.MustBuildPackage(packageName, version),
-			property.MustBuildBundleObjectRef(filepath.Join("objects", testBundleName(packageName, version)+".csv.yaml")),
-			property.MustBuildBundleObjectData([]byte(`{"kind": "CustomResourceDefinition", "apiVersion": "apiextensions.k8s.io/v1"}`)),
+		Properties: []property2.Property{
+			property2.MustBuildPackage(packageName, version),
+			property2.MustBuildBundleObjectRef(filepath.Join("objects", testBundleName(packageName, version)+".csv.yaml")),
+			property2.MustBuildBundleObjectData([]byte(`{"kind": "CustomResourceDefinition", "apiVersion": "apiextensions.k8s.io/v1"}`)),
 		},
 		RelatedImages: []RelatedImage{
 			{
@@ -144,36 +144,36 @@ func newTestPackage(packageName, defaultChannel, svgData string) Package {
 	return p
 }
 
-func buildTestModel() model.Model {
-	return model.Model{
+func buildTestModel() model2.Model {
+	return model2.Model{
 		"anakin":    buildAnakinPkgModel(),
 		"boba-fett": buildBobaFettPkgModel(),
 	}
 }
 
-func buildAnakinPkgModel() *model.Package {
+func buildAnakinPkgModel() *model2.Package {
 	pkgName := "anakin"
-	pkg := &model.Package{
+	pkg := &model2.Package{
 		Name:        pkgName,
 		Description: testPackageDescription(pkgName),
-		Icon: &model.Icon{
+		Icon: &model2.Icon{
 			Data:      []byte(svgSmallCircle),
 			MediaType: "image/svg+xml",
 		},
-		Channels: map[string]*model.Channel{},
+		Channels: map[string]*model2.Channel{},
 	}
 
 	for _, chName := range []string{"light", "dark"} {
-		ch := &model.Channel{
+		ch := &model2.Channel{
 			Package: pkg,
 			Name:    chName,
-			Bundles: map[string]*model.Bundle{},
+			Bundles: map[string]*model2.Bundle{},
 		}
 		pkg.Channels[ch.Name] = ch
 	}
 	pkg.DefaultChannel = pkg.Channels["dark"]
 
-	versions := map[string][]property.Channel{
+	versions := map[string][]property2.Channel{
 		"0.0.1": {{Name: "light"}, {Name: "dark"}},
 		"0.1.0": {
 			{Name: "light", Replaces: testBundleName(pkgName, "0.0.1")},
@@ -184,13 +184,13 @@ func buildAnakinPkgModel() *model.Package {
 	for version, channels := range versions {
 		csvJson := fmt.Sprintf(`{"kind": "ClusterServiceVersion", "apiVersion": "operators.coreos.com/v1alpha1", "metadata":{"name":%q}}`, testBundleName(pkgName, version))
 		crdJson := `{"kind": "CustomResourceDefinition", "apiVersion": "apiextensions.k8s.io/v1"}`
-		props := []property.Property{
-			property.MustBuildPackage(pkgName, version),
-			property.MustBuildBundleObjectRef(filepath.Join("objects", testBundleName(pkgName, version)+".csv.yaml")),
-			property.MustBuildBundleObjectData([]byte(crdJson)),
+		props := []property2.Property{
+			property2.MustBuildPackage(pkgName, version),
+			property2.MustBuildBundleObjectRef(filepath.Join("objects", testBundleName(pkgName, version)+".csv.yaml")),
+			property2.MustBuildBundleObjectData([]byte(crdJson)),
 		}
 		for _, channel := range channels {
-			props = append(props, property.MustBuild(&channel))
+			props = append(props, property2.MustBuild(&channel))
 			ch := pkg.Channels[channel.Name]
 			bName := testBundleName(pkgName, version)
 			bImage := testBundleImage(pkgName, version)
@@ -198,12 +198,12 @@ func buildAnakinPkgModel() *model.Package {
 			if version == "0.1.1" {
 				skip := testBundleName(pkgName, "0.1.0")
 				skips = append(skips, skip)
-				props = append(props, property.MustBuildSkips(skip))
+				props = append(props, property2.MustBuildSkips(skip))
 			}
 
 			props = append(props)
 
-			bundle := &model.Bundle{
+			bundle := &model2.Bundle{
 				Package:    pkg,
 				Channel:    ch,
 				Name:       bName,
@@ -211,7 +211,7 @@ func buildAnakinPkgModel() *model.Package {
 				Replaces:   channel.Replaces,
 				Skips:      skips,
 				Properties: props,
-				RelatedImages: []model.RelatedImage{{
+				RelatedImages: []model2.RelatedImage{{
 					Name:  "bundle",
 					Image: testBundleImage(pkgName, version),
 				}},
@@ -227,50 +227,50 @@ func buildAnakinPkgModel() *model.Package {
 	return pkg
 }
 
-func buildBobaFettPkgModel() *model.Package {
+func buildBobaFettPkgModel() *model2.Package {
 	pkgName := "boba-fett"
-	pkg := &model.Package{
+	pkg := &model2.Package{
 		Name:        pkgName,
 		Description: testPackageDescription(pkgName),
-		Icon: &model.Icon{
+		Icon: &model2.Icon{
 			Data:      []byte(svgBigCircle),
 			MediaType: "image/svg+xml",
 		},
-		Channels: map[string]*model.Channel{},
+		Channels: map[string]*model2.Channel{},
 	}
-	ch := &model.Channel{
+	ch := &model2.Channel{
 		Package: pkg,
 		Name:    "mando",
-		Bundles: map[string]*model.Bundle{},
+		Bundles: map[string]*model2.Bundle{},
 	}
 	pkg.Channels[ch.Name] = ch
 	pkg.DefaultChannel = ch
 
-	versions := map[string][]property.Channel{
+	versions := map[string][]property2.Channel{
 		"1.0.0": {{Name: "mando"}},
 		"2.0.0": {{Name: "mando", Replaces: testBundleName(pkgName, "1.0.0")}},
 	}
 	for version, channels := range versions {
 		csvJson := fmt.Sprintf(`{"kind": "ClusterServiceVersion", "apiVersion": "operators.coreos.com/v1alpha1", "metadata":{"name":%q}}`, testBundleName(pkgName, version))
 		crdJson := `{"kind": "CustomResourceDefinition", "apiVersion": "apiextensions.k8s.io/v1"}`
-		props := []property.Property{
-			property.MustBuildPackage(pkgName, version),
-			property.MustBuildBundleObjectRef(filepath.Join("objects", testBundleName(pkgName, version)+".csv.yaml")),
-			property.MustBuildBundleObjectData([]byte(crdJson)),
+		props := []property2.Property{
+			property2.MustBuildPackage(pkgName, version),
+			property2.MustBuildBundleObjectRef(filepath.Join("objects", testBundleName(pkgName, version)+".csv.yaml")),
+			property2.MustBuildBundleObjectData([]byte(crdJson)),
 		}
 		for _, channel := range channels {
-			props = append(props, property.MustBuild(&channel))
+			props = append(props, property2.MustBuild(&channel))
 			ch := pkg.Channels[channel.Name]
 			bName := testBundleName(pkgName, version)
 			bImage := testBundleImage(pkgName, version)
-			bundle := &model.Bundle{
+			bundle := &model2.Bundle{
 				Package:    pkg,
 				Channel:    ch,
 				Name:       bName,
 				Image:      bImage,
 				Replaces:   channel.Replaces,
 				Properties: props,
-				RelatedImages: []model.RelatedImage{{
+				RelatedImages: []model2.RelatedImage{{
 					Name:  "bundle",
 					Image: testBundleImage(pkgName, version),
 				}},

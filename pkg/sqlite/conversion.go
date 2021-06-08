@@ -10,12 +10,12 @@ import (
 	"github.com/operator-framework/api/pkg/operators/v1alpha1"
 	"github.com/sirupsen/logrus"
 
-	"github.com/operator-framework/operator-registry/internal/model"
+	model2 "github.com/operator-framework/operator-registry/alpha/model"
 	"github.com/operator-framework/operator-registry/pkg/api"
 	"github.com/operator-framework/operator-registry/pkg/registry"
 )
 
-func ToModel(ctx context.Context, q *SQLQuerier) (model.Model, error) {
+func ToModel(ctx context.Context, q *SQLQuerier) (model2.Model, error) {
 	pkgs, err := initializeModelPackages(ctx, q)
 	if err != nil {
 		return nil, err
@@ -33,7 +33,7 @@ func ToModel(ctx context.Context, q *SQLQuerier) (model.Model, error) {
 	return pkgs, nil
 }
 
-func initializeModelPackages(ctx context.Context, q *SQLQuerier) (model.Model, error) {
+func initializeModelPackages(ctx context.Context, q *SQLQuerier) (model2.Model, error) {
 	pkgNames, err := q.ListPackages(ctx)
 	if err != nil {
 		return nil, err
@@ -48,18 +48,18 @@ func initializeModelPackages(ctx context.Context, q *SQLQuerier) (model.Model, e
 		rPkgs = append(rPkgs, *rPkg)
 	}
 
-	pkgs := model.Model{}
+	pkgs := model2.Model{}
 	for _, rPkg := range rPkgs {
-		pkg := model.Package{
+		pkg := model2.Package{
 			Name: rPkg.PackageName,
 		}
 
-		pkg.Channels = map[string]*model.Channel{}
+		pkg.Channels = map[string]*model2.Channel{}
 		for _, ch := range rPkg.Channels {
-			channel := &model.Channel{
+			channel := &model2.Channel{
 				Package: &pkg,
 				Name:    ch.Name,
-				Bundles: map[string]*model.Bundle{},
+				Bundles: map[string]*model2.Bundle{},
 			}
 			if ch.Name == rPkg.DefaultChannelName {
 				pkg.DefaultChannel = channel
@@ -71,7 +71,7 @@ func initializeModelPackages(ctx context.Context, q *SQLQuerier) (model.Model, e
 	return pkgs, nil
 }
 
-func populateModelChannels(ctx context.Context, pkgs model.Model, q *SQLQuerier) error {
+func populateModelChannels(ctx context.Context, pkgs model2.Model, q *SQLQuerier) error {
 	bundles, err := q.ListBundles(ctx)
 	if err != nil {
 		return err
@@ -100,7 +100,7 @@ func populateModelChannels(ctx context.Context, pkgs model.Model, q *SQLQuerier)
 
 // populatePackageIcons populates the package icons from the icon of bundle of the head
 // of the default channel of each of the pacakges in pkgs.
-func populatePackageIcons(ctx context.Context, pkgs model.Model, q *SQLQuerier) error {
+func populatePackageIcons(ctx context.Context, pkgs model2.Model, q *SQLQuerier) error {
 	for _, pkg := range pkgs {
 		head, err := q.GetBundleForChannel(ctx, pkg.Name, pkg.DefaultChannel.Name)
 		if err != nil {
@@ -123,7 +123,7 @@ func populatePackageIcons(ctx context.Context, pkgs model.Model, q *SQLQuerier) 
 			}
 		}
 		if len(iconData) > 0 {
-			pkg.Icon = &model.Icon{
+			pkg.Icon = &model2.Icon{
 				Data:      iconData,
 				MediaType: csv.Spec.Icon[0].MediaType,
 			}

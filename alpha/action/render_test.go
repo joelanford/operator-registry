@@ -9,9 +9,9 @@ import (
 	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/util/yaml"
 
-	"github.com/operator-framework/operator-registry/internal/action"
-	"github.com/operator-framework/operator-registry/internal/declcfg"
-	"github.com/operator-framework/operator-registry/internal/property"
+	action2 "github.com/operator-framework/operator-registry/alpha/action"
+	declcfg2 "github.com/operator-framework/operator-registry/alpha/declcfg"
+	property2 "github.com/operator-framework/operator-registry/alpha/property"
 	"github.com/operator-framework/operator-registry/pkg/containertools"
 	"github.com/operator-framework/operator-registry/pkg/image"
 	"github.com/operator-framework/operator-registry/pkg/lib/bundle"
@@ -20,8 +20,8 @@ import (
 func TestRender(t *testing.T) {
 	type spec struct {
 		name      string
-		render    action.Render
-		expectCfg *declcfg.DeclarativeConfig
+		render    action2.Render
+		expectCfg *declcfg2.DeclarativeConfig
 		assertion require.ErrorAssertionFunc
 	}
 
@@ -48,35 +48,35 @@ func TestRender(t *testing.T) {
 	specs := []spec{
 		{
 			name: "Success/SqliteIndexImage",
-			render: action.Render{
+			render: action2.Render{
 				Refs:     []string{"test.registry/foo-operator/foo-index-sqlite:v0.2.0"},
 				Registry: registry,
 			},
-			expectCfg: &declcfg.DeclarativeConfig{
-				Packages: []declcfg.Package{
+			expectCfg: &declcfg2.DeclarativeConfig{
+				Packages: []declcfg2.Package{
 					{
 						Schema:         "olm.package",
 						Name:           "foo",
 						DefaultChannel: "beta",
 					},
 				},
-				Bundles: []declcfg.Bundle{
+				Bundles: []declcfg2.Bundle{
 					{
 						Schema:  "olm.bundle",
 						Name:    "foo.v0.1.0",
 						Package: "foo",
 						Image:   "test.registry/foo-operator/foo-bundle:v0.1.0",
-						Properties: []property.Property{
-							property.MustBuildChannel("beta", ""),
-							property.MustBuildGVK("test.foo", "v1", "Foo"),
-							property.MustBuildGVKRequired("test.bar", "v1alpha1", "Bar"),
-							property.MustBuildPackage("foo", "0.1.0"),
-							property.MustBuildPackageRequired("bar", "v0.1.0"),
-							property.MustBuildSkipRange("<0.1.0"),
-							property.MustBuildBundleObjectData(foov1csv),
-							property.MustBuildBundleObjectData(foov1crd),
+						Properties: []property2.Property{
+							property2.MustBuildChannel("beta", ""),
+							property2.MustBuildGVK("test.foo", "v1", "Foo"),
+							property2.MustBuildGVKRequired("test.bar", "v1alpha1", "Bar"),
+							property2.MustBuildPackage("foo", "0.1.0"),
+							property2.MustBuildPackageRequired("bar", "v0.1.0"),
+							property2.MustBuildSkipRange("<0.1.0"),
+							property2.MustBuildBundleObjectData(foov1csv),
+							property2.MustBuildBundleObjectData(foov1crd),
 						},
-						RelatedImages: []declcfg.RelatedImage{
+						RelatedImages: []declcfg2.RelatedImage{
 							{
 								Name:  "operator",
 								Image: "test.registry/foo-operator/foo:v0.1.0",
@@ -90,19 +90,19 @@ func TestRender(t *testing.T) {
 						Name:    "foo.v0.2.0",
 						Package: "foo",
 						Image:   "test.registry/foo-operator/foo-bundle:v0.2.0",
-						Properties: []property.Property{
-							property.MustBuildChannel("beta", "foo.v0.1.0"),
-							property.MustBuildGVK("test.foo", "v1", "Foo"),
-							property.MustBuildGVKRequired("test.bar", "v1alpha1", "Bar"),
-							property.MustBuildPackage("foo", "0.2.0"),
-							property.MustBuildPackageRequired("bar", "v0.1.0"),
-							property.MustBuildSkipRange("<0.2.0"),
-							property.MustBuildSkips("foo.v0.1.1"),
-							property.MustBuildSkips("foo.v0.1.2"),
-							property.MustBuildBundleObjectData(foov2csv),
-							property.MustBuildBundleObjectData(foov2crd),
+						Properties: []property2.Property{
+							property2.MustBuildChannel("beta", "foo.v0.1.0"),
+							property2.MustBuildGVK("test.foo", "v1", "Foo"),
+							property2.MustBuildGVKRequired("test.bar", "v1alpha1", "Bar"),
+							property2.MustBuildPackage("foo", "0.2.0"),
+							property2.MustBuildPackageRequired("bar", "v0.1.0"),
+							property2.MustBuildSkipRange("<0.2.0"),
+							property2.MustBuildSkips("foo.v0.1.1"),
+							property2.MustBuildSkips("foo.v0.1.2"),
+							property2.MustBuildBundleObjectData(foov2csv),
+							property2.MustBuildBundleObjectData(foov2crd),
 						},
-						RelatedImages: []declcfg.RelatedImage{
+						RelatedImages: []declcfg2.RelatedImage{
 							{
 								Name:  "operator",
 								Image: "test.registry/foo-operator/foo:v0.2.0",
@@ -117,35 +117,35 @@ func TestRender(t *testing.T) {
 		},
 		{
 			name: "Success/DeclcfgIndexImage",
-			render: action.Render{
+			render: action2.Render{
 				Refs:     []string{"test.registry/foo-operator/foo-index-declcfg:v0.2.0"},
 				Registry: registry,
 			},
-			expectCfg: &declcfg.DeclarativeConfig{
-				Packages: []declcfg.Package{
+			expectCfg: &declcfg2.DeclarativeConfig{
+				Packages: []declcfg2.Package{
 					{
 						Schema:         "olm.package",
 						Name:           "foo",
 						DefaultChannel: "beta",
 					},
 				},
-				Bundles: []declcfg.Bundle{
+				Bundles: []declcfg2.Bundle{
 					{
 						Schema:  "olm.bundle",
 						Name:    "foo.v0.1.0",
 						Package: "foo",
 						Image:   "test.registry/foo-operator/foo-bundle:v0.1.0",
-						Properties: []property.Property{
-							property.MustBuildChannel("beta", ""),
-							property.MustBuildGVK("test.foo", "v1", "Foo"),
-							property.MustBuildGVKRequired("test.bar", "v1alpha1", "Bar"),
-							property.MustBuildPackage("foo", "0.1.0"),
-							property.MustBuildPackageRequired("bar", "v0.1.0"),
-							property.MustBuildSkipRange("<0.1.0"),
-							property.MustBuildBundleObjectData(foov1csv),
-							property.MustBuildBundleObjectData(foov1crd),
+						Properties: []property2.Property{
+							property2.MustBuildChannel("beta", ""),
+							property2.MustBuildGVK("test.foo", "v1", "Foo"),
+							property2.MustBuildGVKRequired("test.bar", "v1alpha1", "Bar"),
+							property2.MustBuildPackage("foo", "0.1.0"),
+							property2.MustBuildPackageRequired("bar", "v0.1.0"),
+							property2.MustBuildSkipRange("<0.1.0"),
+							property2.MustBuildBundleObjectData(foov1csv),
+							property2.MustBuildBundleObjectData(foov1crd),
 						},
-						RelatedImages: []declcfg.RelatedImage{
+						RelatedImages: []declcfg2.RelatedImage{
 							{
 								Name:  "operator",
 								Image: "test.registry/foo-operator/foo:v0.1.0",
@@ -159,19 +159,19 @@ func TestRender(t *testing.T) {
 						Name:    "foo.v0.2.0",
 						Package: "foo",
 						Image:   "test.registry/foo-operator/foo-bundle:v0.2.0",
-						Properties: []property.Property{
-							property.MustBuildChannel("beta", "foo.v0.1.0"),
-							property.MustBuildGVK("test.foo", "v1", "Foo"),
-							property.MustBuildGVKRequired("test.bar", "v1alpha1", "Bar"),
-							property.MustBuildPackage("foo", "0.2.0"),
-							property.MustBuildPackageRequired("bar", "v0.1.0"),
-							property.MustBuildSkipRange("<0.2.0"),
-							property.MustBuildSkips("foo.v0.1.1"),
-							property.MustBuildSkips("foo.v0.1.2"),
-							property.MustBuildBundleObjectData(foov2csv),
-							property.MustBuildBundleObjectData(foov2crd),
+						Properties: []property2.Property{
+							property2.MustBuildChannel("beta", "foo.v0.1.0"),
+							property2.MustBuildGVK("test.foo", "v1", "Foo"),
+							property2.MustBuildGVKRequired("test.bar", "v1alpha1", "Bar"),
+							property2.MustBuildPackage("foo", "0.2.0"),
+							property2.MustBuildPackageRequired("bar", "v0.1.0"),
+							property2.MustBuildSkipRange("<0.2.0"),
+							property2.MustBuildSkips("foo.v0.1.1"),
+							property2.MustBuildSkips("foo.v0.1.2"),
+							property2.MustBuildBundleObjectData(foov2csv),
+							property2.MustBuildBundleObjectData(foov2crd),
 						},
-						RelatedImages: []declcfg.RelatedImage{
+						RelatedImages: []declcfg2.RelatedImage{
 							{
 								Name:  "operator",
 								Image: "test.registry/foo-operator/foo:v0.2.0",
@@ -186,28 +186,28 @@ func TestRender(t *testing.T) {
 		},
 		{
 			name: "Success/BundleImage",
-			render: action.Render{
+			render: action2.Render{
 				Refs:     []string{"test.registry/foo-operator/foo-bundle:v0.2.0"},
 				Registry: registry,
 			},
-			expectCfg: &declcfg.DeclarativeConfig{
-				Bundles: []declcfg.Bundle{
+			expectCfg: &declcfg2.DeclarativeConfig{
+				Bundles: []declcfg2.Bundle{
 					{
 						Schema:  "olm.bundle",
 						Name:    "foo.v0.2.0",
 						Package: "foo",
 						Image:   "test.registry/foo-operator/foo-bundle:v0.2.0",
-						Properties: []property.Property{
-							property.MustBuildChannel("beta", "foo.v0.1.0"),
-							property.MustBuildGVK("test.foo", "v1", "Foo"),
-							property.MustBuildGVKRequired("test.bar", "v1alpha1", "Bar"),
-							property.MustBuildPackage("foo", "0.2.0"),
-							property.MustBuildPackageRequired("bar", "v0.1.0"),
-							property.MustBuildSkipRange("<0.2.0"),
-							property.MustBuildSkips("foo.v0.1.1"),
-							property.MustBuildSkips("foo.v0.1.2"),
+						Properties: []property2.Property{
+							property2.MustBuildChannel("beta", "foo.v0.1.0"),
+							property2.MustBuildGVK("test.foo", "v1", "Foo"),
+							property2.MustBuildGVKRequired("test.bar", "v1alpha1", "Bar"),
+							property2.MustBuildPackage("foo", "0.2.0"),
+							property2.MustBuildPackageRequired("bar", "v0.1.0"),
+							property2.MustBuildSkipRange("<0.2.0"),
+							property2.MustBuildSkips("foo.v0.1.1"),
+							property2.MustBuildSkips("foo.v0.1.2"),
 						},
-						RelatedImages: []declcfg.RelatedImage{
+						RelatedImages: []declcfg2.RelatedImage{
 							{
 								Name:  "operator",
 								Image: "test.registry/foo-operator/foo:v0.2.0",

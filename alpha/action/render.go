@@ -12,8 +12,8 @@ import (
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/util/sets"
 
-	"github.com/operator-framework/operator-registry/internal/declcfg"
-	"github.com/operator-framework/operator-registry/internal/property"
+	declcfg2 "github.com/operator-framework/operator-registry/alpha/declcfg"
+	property2 "github.com/operator-framework/operator-registry/alpha/property"
 	"github.com/operator-framework/operator-registry/pkg/containertools"
 	"github.com/operator-framework/operator-registry/pkg/image"
 	"github.com/operator-framework/operator-registry/pkg/image/containerdregistry"
@@ -33,7 +33,7 @@ func nullLogger() *logrus.Entry {
 	return logrus.NewEntry(logger)
 }
 
-func (r Render) Run(ctx context.Context) (*declcfg.DeclarativeConfig, error) {
+func (r Render) Run(ctx context.Context) (*declcfg2.DeclarativeConfig, error) {
 	if r.Registry == nil {
 		reg, err := r.createRegistry()
 		if err != nil {
@@ -43,15 +43,15 @@ func (r Render) Run(ctx context.Context) (*declcfg.DeclarativeConfig, error) {
 		r.Registry = reg
 	}
 
-	var cfgs []declcfg.DeclarativeConfig
+	var cfgs []declcfg2.DeclarativeConfig
 	for _, ref := range r.Refs {
 		var (
-			cfg *declcfg.DeclarativeConfig
+			cfg *declcfg2.DeclarativeConfig
 			err error
 		)
 		// TODO(joelanford): Add support for detecting and rendering sqlite files.
 		if stat, serr := os.Stat(ref); serr == nil && stat.IsDir() {
-			cfg, err = declcfg.LoadDir(ref)
+			cfg, err = declcfg2.LoadDir(ref)
 		} else {
 			cfg, err = r.imageToDeclcfg(ctx, ref)
 		}
@@ -85,7 +85,7 @@ func (r Render) createRegistry() (*containerdregistry.Registry, error) {
 	return reg, nil
 }
 
-func (r Render) imageToDeclcfg(ctx context.Context, imageRef string) (*declcfg.DeclarativeConfig, error) {
+func (r Render) imageToDeclcfg(ctx context.Context, imageRef string) (*declcfg2.DeclarativeConfig, error) {
 	ref := image.SimpleReference(imageRef)
 	if err := r.Registry.Pull(ctx, ref); err != nil {
 		return nil, err
@@ -103,7 +103,7 @@ func (r Render) imageToDeclcfg(ctx context.Context, imageRef string) (*declcfg.D
 		return nil, err
 	}
 
-	var cfg *declcfg.DeclarativeConfig
+	var cfg *declcfg2.DeclarativeConfig
 	if dbFile, ok := labels[containertools.DbLocationLabel]; ok {
 		cfg, err = sqliteToDeclcfg(ctx, filepath.Join(tmpDir, dbFile))
 		if err != nil {
@@ -111,7 +111,7 @@ func (r Render) imageToDeclcfg(ctx context.Context, imageRef string) (*declcfg.D
 		}
 	} else if configsDir, ok := labels["operators.operatorframework.io.index.configs.v1"]; ok {
 		// TODO(joelanford): Make a constant for above configs location label
-		cfg, err = declcfg.LoadDir(filepath.Join(tmpDir, configsDir))
+		cfg, err = declcfg2.LoadDir(filepath.Join(tmpDir, configsDir))
 		if err != nil {
 			return nil, err
 		}
@@ -140,7 +140,7 @@ func (r Render) imageToDeclcfg(ctx context.Context, imageRef string) (*declcfg.D
 	return cfg, nil
 }
 
-func sqliteToDeclcfg(ctx context.Context, dbFile string) (*declcfg.DeclarativeConfig, error) {
+func sqliteToDeclcfg(ctx context.Context, dbFile string) (*declcfg2.DeclarativeConfig, error) {
 	db, err := sqlite.Open(dbFile)
 	if err != nil {
 		return nil, err
@@ -164,11 +164,11 @@ func sqliteToDeclcfg(ctx context.Context, dbFile string) (*declcfg.DeclarativeCo
 		return nil, err
 	}
 
-	cfg := declcfg.ConvertFromModel(m)
+	cfg := declcfg2.ConvertFromModel(m)
 	return &cfg, nil
 }
 
-func bundleToDeclcfg(bundle *registry.Bundle) (*declcfg.DeclarativeConfig, error) {
+func bundleToDeclcfg(bundle *registry.Bundle) (*declcfg2.DeclarativeConfig, error) {
 	bundleProperties, err := registry.PropertiesFromBundle(bundle)
 	if err != nil {
 		return nil, fmt.Errorf("get properties for bundle %q: %v", bundle.Name, err)
@@ -178,7 +178,7 @@ func bundleToDeclcfg(bundle *registry.Bundle) (*declcfg.DeclarativeConfig, error
 		return nil, fmt.Errorf("get related images for bundle %q: %v", bundle.Name, err)
 	}
 
-	dBundle := declcfg.Bundle{
+	dBundle := declcfg2.Bundle{
 		Schema:        "olm.bundle",
 		Name:          bundle.Name,
 		Package:       bundle.Package,
@@ -187,10 +187,10 @@ func bundleToDeclcfg(bundle *registry.Bundle) (*declcfg.DeclarativeConfig, error
 		RelatedImages: relatedImages,
 	}
 
-	return &declcfg.DeclarativeConfig{Bundles: []declcfg.Bundle{dBundle}}, nil
+	return &declcfg2.DeclarativeConfig{Bundles: []declcfg2.Bundle{dBundle}}, nil
 }
 
-func getRelatedImages(b *registry.Bundle) ([]declcfg.RelatedImage, error) {
+func getRelatedImages(b *registry.Bundle) ([]declcfg2.RelatedImage, error) {
 	csv, err := b.ClusterServiceVersion()
 	if err != nil {
 		return nil, err
@@ -206,31 +206,31 @@ func getRelatedImages(b *registry.Bundle) ([]declcfg.RelatedImage, error) {
 		return nil, err
 	}
 
-	var relatedImages []declcfg.RelatedImage
+	var relatedImages []declcfg2.RelatedImage
 	if err = json.Unmarshal(*rawValue, &relatedImages); err != nil {
 		return nil, err
 	}
 	return relatedImages, nil
 }
 
-func renderBundleObjects(cfg *declcfg.DeclarativeConfig) {
+func renderBundleObjects(cfg *declcfg2.DeclarativeConfig) {
 	for bi, b := range cfg.Bundles {
 		props := b.Properties[:0]
 		for _, p := range b.Properties {
-			if p.Type != property.TypeBundleObject {
+			if p.Type != property2.TypeBundleObject {
 				props = append(props, p)
 			}
 		}
 
 		for _, obj := range b.Objects {
-			props = append(props, property.MustBuildBundleObjectData([]byte(obj)))
+			props = append(props, property2.MustBuildBundleObjectData([]byte(obj)))
 		}
 		cfg.Bundles[bi].Properties = props
 	}
 }
 
-func combineConfigs(cfgs []declcfg.DeclarativeConfig) *declcfg.DeclarativeConfig {
-	out := &declcfg.DeclarativeConfig{}
+func combineConfigs(cfgs []declcfg2.DeclarativeConfig) *declcfg2.DeclarativeConfig {
+	out := &declcfg2.DeclarativeConfig{}
 	for _, in := range cfgs {
 		out.Packages = append(out.Packages, in.Packages...)
 		out.Bundles = append(out.Bundles, in.Bundles...)

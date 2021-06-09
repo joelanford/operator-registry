@@ -198,6 +198,15 @@ func PropertiesFromBundle(b *Bundle) ([]property2.Property, error) {
 		packageProvidedProperty = &p
 	}
 	out = append(out, *packageProvidedProperty)
+
+	subsFor, err := b.SubstitutesFor()
+	if err != nil {
+		return nil, fmt.Errorf("get csv substitutesFor: %v", err)
+	}
+	if subsFor != "" {
+		out = append(out, property2.MustBuildSubstitutesFor(subsFor))
+	}
+
 	out = append(out, graphProps...)
 
 	for p := range providedGVKs {

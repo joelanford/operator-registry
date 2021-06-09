@@ -8,6 +8,7 @@ import (
 func init() {
 	skips := Skips("")
 	skipRange := SkipRange("")
+	subsFor := SubstitutesFor("")
 
 	scheme = map[reflect.Type]string{
 		reflect.TypeOf(&Package{}):         TypePackage,
@@ -18,6 +19,7 @@ func init() {
 		reflect.TypeOf(&skips):             TypeSkips,
 		reflect.TypeOf(&skipRange):         TypeSkipRange,
 		reflect.TypeOf(&BundleObject{}):    TypeBundleObject,
+		reflect.TypeOf(&subsFor): TypeSubstitutesFor,
 	}
 }
 

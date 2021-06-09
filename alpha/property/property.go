@@ -127,6 +127,8 @@ func (f File) GetData(root, cwd string) ([]byte, error) {
 	return ioutil.ReadFile(refAbs)
 }
 
+type SubstitutesFor string
+
 type Properties struct {
 	Packages         []Package
 	PackagesRequired []PackageRequired
@@ -136,6 +138,7 @@ type Properties struct {
 	Skips            []Skips
 	SkipRanges       []SkipRange
 	BundleObjects    []BundleObject
+	SubstitutesFors  []SubstitutesFor
 
 	Others []Property
 }
@@ -149,6 +152,7 @@ const (
 	TypeSkips           = "olm.skips"
 	TypeSkipRange       = "olm.skipRange"
 	TypeBundleObject    = "olm.bundle.object"
+	TypeSubstitutesFor  = "olm.substitutesFor"
 )
 
 func Parse(in []Property) (*Properties, error) {
@@ -203,6 +207,12 @@ func Parse(in []Property) (*Properties, error) {
 				return nil, ParseError{Idx: i, Typ: prop.Type, Err: err}
 			}
 			out.BundleObjects = append(out.BundleObjects, p)
+		case TypeSubstitutesFor:
+			var p SubstitutesFor
+			if err := json.Unmarshal(prop.Value, &p); err != nil {
+				return nil, ParseError{Idx: i, Typ: prop.Type, Err: err}
+			}
+			out.SubstitutesFors = append(out.SubstitutesFors, p)
 		default:
 			var p json.RawMessage
 			if err := json.Unmarshal(prop.Value, &p); err != nil {
@@ -314,4 +324,8 @@ func MustBuildBundleObjectRef(ref string) Property {
 }
 func MustBuildBundleObjectData(data []byte) Property {
 	return MustBuild(&BundleObject{File: File{data: data}})
+}
+func MustBuildSubstitutesFor(subsFor string) Property {
+	s := SubstitutesFor(subsFor)
+	return MustBuild(&s)
 }

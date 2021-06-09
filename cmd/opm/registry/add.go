@@ -36,6 +36,7 @@ func newRegistryAddCmd() *cobra.Command {
 	rootCmd.Flags().String("ca-file", "", "the root certificates to use when --container-tool=none; see docker/podman docs for certificate loading instructions")
 	rootCmd.Flags().StringP("mode", "", "replaces", "graph update mode that defines how channel graphs are updated. One of: [replaces, semver, semver-skippatch]")
 	rootCmd.Flags().StringP("container-tool", "c", "none", "tool to interact with container images (save, build, etc.). One of: [none, docker, podman]")
+	rootCmd.Flags().Bool("enable-alpha", false, "Enable alpha features")
 
 	return rootCmd
 }
@@ -62,6 +63,10 @@ func addFunc(cmd *cobra.Command, args []string) error {
 		return err
 	}
 	containerToolStr, err := cmd.Flags().GetString("container-tool")
+	if err != nil {
+		return err
+	}
+	enableAlpha, err := cmd.Flags().GetBool("enable-alpha")
 	if err != nil {
 		return err
 	}
@@ -94,6 +99,7 @@ func addFunc(cmd *cobra.Command, args []string) error {
 		Mode:          modeEnum,
 		ContainerTool: containerTool,
 		Overwrite:     false,
+		EnableAlpha:   enableAlpha,
 	}
 
 	logger := logrus.WithFields(logrus.Fields{"bundles": bundleImages})

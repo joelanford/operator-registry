@@ -22,9 +22,25 @@ import (
 	"github.com/operator-framework/operator-registry/pkg/sqlite"
 )
 
+type RefType uint
+
+const (
+	RefBundleImage RefType = 1 << iota
+	RefSqliteImage
+	RefDCImage
+	RefDCDir
+
+	RefAll = 0
+)
+
+func (r RefType) Allowed(refType RefType) bool {
+	return r == RefAll || r&refType == refType
+}
+
 type Render struct {
-	Refs     []string
-	Registry image.Registry
+	Refs      []string
+	Registry  image.Registry
+	AllowMask RefType
 }
 
 func nullLogger() *logrus.Entry {
@@ -51,6 +67,9 @@ func (r Render) Run(ctx context.Context) (*declcfg2.DeclarativeConfig, error) {
 		)
 		// TODO(joelanford): Add support for detecting and rendering sqlite files.
 		if stat, serr := os.Stat(ref); serr == nil && stat.IsDir() {
+			if !r.AllowMask.Allowed(RefDCDir) {
+				return nil, fmt.Errorf("cannot render DC dir: not allowed")
+			}
 			cfg, err = declcfg2.LoadDir(ref)
 		} else {
 			cfg, err = r.imageToDeclcfg(ctx, ref)
@@ -105,17 +124,26 @@ func (r Render) imageToDeclcfg(ctx context.Context, imageRef string) (*declcfg2.
 
 	var cfg *declcfg2.DeclarativeConfig
 	if dbFile, ok := labels[containertools.DbLocationLabel]; ok {
+		if !r.AllowMask.Allowed(RefSqliteImage) {
+			return nil, fmt.Errorf("cannot render sqlite index image: not allowed")
+		}
 		cfg, err = sqliteToDeclcfg(ctx, filepath.Join(tmpDir, dbFile))
 		if err != nil {
 			return nil, err
 		}
 	} else if configsDir, ok := labels["operators.operatorframework.io.index.configs.v1"]; ok {
+		if !r.AllowMask.Allowed(RefDCImage) {
+			return nil, fmt.Errorf("cannot render DC index image: not allowed")
+		}
 		// TODO(joelanford): Make a constant for above configs location label
 		cfg, err = declcfg2.LoadDir(filepath.Join(tmpDir, configsDir))
 		if err != nil {
 			return nil, err
 		}
 	} else if _, ok := labels[bundle.PackageLabel]; ok {
+		if !r.AllowMask.Allowed(RefBundleImage) {
+			return nil, fmt.Errorf("cannot render bundle image: not allowed")
+		}
 		img, err := registry.NewImageInput(ref, tmpDir)
 		if err != nil {
 			return nil, err

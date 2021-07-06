@@ -1,0 +1,197 @@
+package action
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"io"
+	"sort"
+	"strings"
+	"text/tabwriter"
+
+	"github.com/operator-framework/api/pkg/operators/v1alpha1"
+
+	"github.com/operator-framework/operator-registry/internal/declcfg"
+	"github.com/operator-framework/operator-registry/internal/model"
+	"github.com/operator-framework/operator-registry/internal/property"
+)
+
+type ListPackages struct {
+	IndexReference string
+}
+
+func (l *ListPackages) Run(ctx context.Context) (*ListPackagesResult, error) {
+	m, err := indexRefToModel(ctx, l.IndexReference)
+	if err != nil {
+		return nil, err
+	}
+
+	pkgs := []model.Package{}
+	for _, pkg := range m {
+		pkgs = append(pkgs, *pkg)
+	}
+	sort.Slice(pkgs, func(i, j int) bool {
+		return pkgs[i].Name < pkgs[j].Name
+	})
+	return &ListPackagesResult{Packages: pkgs}, nil
+}
+
+type ListPackagesResult struct {
+	Packages []model.Package
+}
+
+func (r *ListPackagesResult) WriteColumns(w io.Writer) error {
+	tw := tabwriter.NewWriter(w, 0, 4, 2, ' ', 0)
+	if _, err := fmt.Fprintln(tw, "NAME\tDISPLAY NAME\tDEFAULT CHANNEL"); err != nil {
+		return err
+	}
+	for _, pkg := range r.Packages {
+		if _, err := fmt.Fprintf(tw, "%s\t%s\t%s\n", pkg.Name, getDisplayName(pkg), pkg.DefaultChannel.Name); err != nil {
+			return err
+		}
+	}
+	return tw.Flush()
+}
+
+func getDisplayName(pkg model.Package) string {
+	if pkg.DefaultChannel == nil {
+		return ""
+	}
+	head, err := pkg.DefaultChannel.Head()
+	if err != nil || head == nil || head.CsvJSON == "" {
+		return ""
+	}
+
+	csv := v1alpha1.ClusterServiceVersion{}
+	if err := json.Unmarshal([]byte(head.CsvJSON), &csv); err != nil {
+		return ""
+	}
+	return csv.Spec.DisplayName
+}
+
+func indexRefToModel(ctx context.Context, ref string) (model.Model, error) {
+	render := Render{Refs: []string{ref}}
+	cfg, err := render.Run(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return declcfg.ConvertToModel(*cfg)
+}
+
+type ListChannels struct {
+	IndexReference string
+	PackageName    string
+}
+
+func (l *ListChannels) Run(ctx context.Context) (*ListChannelsResult, error) {
+	m, err := indexRefToModel(ctx, l.IndexReference)
+	if err != nil {
+		return nil, err
+	}
+
+	pkg, ok := m[l.PackageName]
+	if !ok {
+		return nil, fmt.Errorf("package %q not found in index %q", l.PackageName, l.IndexReference)
+	}
+
+	channels := []model.Channel{}
+	for _, ch := range pkg.Channels {
+		channels = append(channels, *ch)
+	}
+	sort.Slice(channels, func(i, j int) bool {
+		return channels[i].Name < channels[j].Name
+	})
+	return &ListChannelsResult{Channels: channels}, nil
+}
+
+type ListChannelsResult struct {
+	Channels []model.Channel
+}
+
+func (r *ListChannelsResult) WriteColumns(w io.Writer) error {
+	tw := tabwriter.NewWriter(w, 0, 4, 2, ' ', 0)
+	if _, err := fmt.Fprintln(tw, "NAME\tHEAD"); err != nil {
+		return err
+	}
+	for _, ch := range r.Channels {
+		headStr := ""
+		head, err := ch.Head()
+		if err != nil {
+			headStr = fmt.Sprintf("ERROR: %s", err)
+		} else {
+			headStr = head.Name
+		}
+		if _, err := fmt.Fprintf(tw, "%s\t%s\n", ch.Name, headStr); err != nil {
+			return err
+		}
+	}
+	return tw.Flush()
+}
+
+type ListBundles struct {
+	IndexReference string
+	PackageName    string
+}
+
+func (l *ListBundles) Run(ctx context.Context) (*ListBundlesResult, error) {
+	m, err := indexRefToModel(ctx, l.IndexReference)
+	if err != nil {
+		return nil, err
+	}
+
+	pkg, ok := m[l.PackageName]
+	if !ok {
+		return nil, fmt.Errorf("package %q not found in index %q", l.PackageName, l.IndexReference)
+	}
+
+	bundles := []model.Bundle{}
+	for _, ch := range pkg.Channels {
+		for _, b := range ch.Bundles {
+			bundles = append(bundles, *b)
+		}
+	}
+	sort.Slice(bundles, func(i, j int) bool {
+		if bundles[i].Channel.Name != bundles[j].Channel.Name {
+			return bundles[i].Channel.Name < bundles[j].Channel.Name
+		}
+		return bundles[i].Name < bundles[j].Name
+	})
+	return &ListBundlesResult{Bundles: bundles}, nil
+}
+
+type ListBundlesResult struct {
+	Bundles []model.Bundle
+}
+
+func (r *ListBundlesResult) WriteColumns(w io.Writer) error {
+	tw := tabwriter.NewWriter(w, 0, 4, 2, ' ', 0)
+	if _, err := fmt.Fprintln(tw, "NAME\tCHANNEL\tREPLACES\tSKIPS\tSKIP RANGE\tIMAGE"); err != nil {
+		return err
+	}
+	for _, b := range r.Bundles {
+		skipRange, err := getSkipRange(b)
+		if err != nil {
+			return fmt.Errorf("get skipRange for bundle %q: %v", b.Name, err)
+		}
+		if _, err := fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\t%s\n", b.Name, b.Channel.Name, b.Replaces, strings.Join(b.Skips, ","), skipRange, b.Image); err != nil {
+			return err
+		}
+
+	}
+	return tw.Flush()
+}
+
+func getSkipRange(b model.Bundle) (string, error) {
+	props, err := property.Parse(b.Properties)
+	if err != nil {
+		return "", err
+	}
+	if len(props.SkipRanges) > 1 {
+		return "", fmt.Errorf("multiple skip ranges not supported")
+	}
+	if len(props.SkipRanges) == 0 {
+		return "", nil
+	}
+	return string(props.SkipRanges[0]), nil
+}

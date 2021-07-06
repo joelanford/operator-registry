@@ -6,6 +6,7 @@ import (
 
 	"github.com/operator-framework/operator-registry/cmd/opm/alpha"
 	"github.com/operator-framework/operator-registry/cmd/opm/index"
+	"github.com/operator-framework/operator-registry/cmd/opm/list"
 	"github.com/operator-framework/operator-registry/cmd/opm/registry"
 	"github.com/operator-framework/operator-registry/cmd/opm/version"
 )
@@ -23,7 +24,7 @@ func NewCmd() *cobra.Command {
 		},
 	}
 
-	cmd.AddCommand(registry.NewOpmRegistryCmd(), alpha.NewCmd())
+	cmd.AddCommand(registry.NewOpmRegistryCmd(), alpha.NewCmd(), list.NewCmd())
 	index.AddCommand(cmd)
 	version.AddCommand(cmd)
 

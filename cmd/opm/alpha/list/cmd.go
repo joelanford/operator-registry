@@ -12,6 +12,6 @@ func NewCmd() *cobra.Command {
 
 ` + humanReadabilityOnlyNote,
 	}
-	list.AddCommand(newPackagesCmd(), newChannelsCmd(), newBundlesCmd())
+	list.AddCommand(newPackagesCmd(), newChannelsCmd(), newBundlesCmd(), newGraphCmd())
 	return list
 }

@@ -1,0 +1,58 @@
+name: images
+
+on:
+  push:
+    branches:
+      - '**'
+    tags:
+      - 'v*'
+  pull_request:
+    paths:
+      - '**'
+      - '!doc/**'
+    branches: [ master ]
+
+jobs:
+  # Job matrix for image builds. Only pushes if a tag with prefix "v" is present.
+  images:
+    runs-on: ubuntu-18.04
+    strategy:
+      matrix:
+        id: ["opm"]
+    steps:
+
+      - name: set up qemu
+        uses: docker/setup-qemu-action@v1
+
+      - name: set up buildx
+        uses: docker/setup-buildx-action@v1
+
+      - name: quay.io login
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v1
+        with:
+          username: ${{ secrets.QUAY_USERNAME }}
+          password: ${{ secrets.QUAY_PASSWORD }}
+          registry: quay.io
+
+      # Check out repo before tag step for script.
+      - name: checkout
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+
+      - name: create tags
+        id: tags
+        run: |
+          IMG=quay.io/${{ github.repository_owner }}/${{ matrix.id }}
+          echo ::set-output name=tags::$(.github/workflows/get_image_tags.sh "$IMG" "v")
+
+      - name: build and push
+        uses: docker/build-push-action@v2
+        with:
+          file: ./images/${{ matrix.id }}/Dockerfile
+          context: .
+          platforms: linux/amd64,linux/arm64,linux/ppc64le,linux/s390x
+          # Push on tag, or master or latest branch push.
+          push: ${{ (github.event_name != 'pull_request' && (startsWith(github.ref, 'refs/tags/') || github.ref == 'refs/heads/master' || github.ref == 'refs/heads/latest')) }}
+          tags: ${{ steps.tags.outputs.tags }}

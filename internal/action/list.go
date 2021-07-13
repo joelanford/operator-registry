@@ -3,6 +3,7 @@ package action
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"sort"
@@ -70,9 +71,15 @@ func getDisplayName(pkg model.Package) string {
 }
 
 func indexRefToModel(ctx context.Context, ref string) (model.Model, error) {
-	render := Render{Refs: []string{ref}}
+	render := Render{
+		Refs:           []string{ref},
+		AllowedRefMask: RefDCImage | RefDCDir | RefSqliteImage | RefSqliteFile,
+	}
 	cfg, err := render.Run(ctx)
 	if err != nil {
+		if errors.Is(err, &ErrNotAllowed{}) {
+			return nil, fmt.Errorf("cannot list non-index %q", ref)
+		}
 		return nil, err
 	}
 

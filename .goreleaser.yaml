@@ -117,7 +117,8 @@ archives:
     name_template: "{{ .Binary }}_{{ .Env.OPM_VERSION }}_{{ .Os }}_{{ .Arch }}"
     format: binary
 dockers:
-  - image_templates: ["quay.io/operator-framework/opm:{{ .Env.OPM_VERSION }}-amd64"]
+  - image_templates:
+      - "{{ .Env.OPM_IMAGE_REPO }}:{{ .Env.IMAGE_TAG }}-amd64"
     ids: ["linux-amd64"]
     goos: linux
     goarch: amd64
@@ -126,7 +127,8 @@ dockers:
     use: buildx
     build_flag_templates:
       - --platform=linux/amd64
-  - image_templates: ["quay.io/operator-framework/opm:{{ .Env.OPM_VERSION }}-arm64"]
+  - image_templates:
+      - "{{ .Env.OPM_IMAGE_REPO }}:{{ .Env.IMAGE_TAG }}-arm64"
     ids: ["linux-arm64"]
     goos: linux
     goarch: arm64
@@ -135,7 +137,8 @@ dockers:
     use: buildx
     build_flag_templates:
       - --platform=linux/arm64
-  - image_templates: ["quay.io/operator-framework/opm:{{ .Env.OPM_VERSION }}-ppc64le"]
+  - image_templates:
+      - "{{ .Env.OPM_IMAGE_REPO }}:{{ .Env.IMAGE_TAG }}-ppc64le"
     ids: ["linux-ppc64le"]
     goos: linux
     goarch: ppc64le
@@ -144,7 +147,8 @@ dockers:
     use: buildx
     build_flag_templates:
       - --platform=linux/ppc64le
-  - image_templates: ["quay.io/operator-framework/opm:{{ .Env.OPM_VERSION }}-s390x"]
+  - image_templates:
+      - "{{ .Env.OPM_IMAGE_REPO }}:{{ .Env.IMAGE_TAG }}-s390x"
     ids: ["linux-s390x"]
     goos: linux
     goarch: s390x
@@ -154,12 +158,12 @@ dockers:
     build_flag_templates:
       - --platform=linux/s390x
 docker_manifests:
-  - name_template: "quay.io/operator-framework/opm:{{ .Env.OPM_VERSION }}"
+  - name_template: "{{ .Env.OPM_IMAGE_REPO }}:{{ .Env.IMAGE_TAG }}"
     image_templates:
-    - "quay.io/operator-framework/opm:{{ .Env.OPM_VERSION }}-amd64"
-    - "quay.io/operator-framework/opm:{{ .Env.OPM_VERSION }}-arm64"
-    - "quay.io/operator-framework/opm:{{ .Env.OPM_VERSION }}-ppc64le"
-    - "quay.io/operator-framework/opm:{{ .Env.OPM_VERSION }}-s390x"
+      - "{{ .Env.OPM_IMAGE_REPO }}:{{ .Env.IMAGE_TAG }}-amd64"
+      - "{{ .Env.OPM_IMAGE_REPO }}:{{ .Env.IMAGE_TAG }}-arm64"
+      - "{{ .Env.OPM_IMAGE_REPO }}:{{ .Env.IMAGE_TAG }}-ppc64le"
+      - "{{ .Env.OPM_IMAGE_REPO }}:{{ .Env.IMAGE_TAG }}-s390x"
 checksum:
   name_template: 'checksums.txt'
 snapshot:
@@ -167,3 +171,4 @@ snapshot:
 release:
   name_template: "{{ .Env.OPM_VERSION }}"
   draft: true
+  disable: true

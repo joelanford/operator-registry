@@ -5,6 +5,7 @@ SPECIFIC_UNIT_TEST := $(if $(TEST),-run $(TEST),)
 export PKG := github.com/operator-framework/operator-registry
 export GIT_COMMIT := $(or $(SOURCE_GIT_COMMIT),$(shell git rev-parse --short HEAD))
 export OPM_VERSION := $(or $(SOURCE_GIT_TAG),$(shell git describe --always --tags HEAD))
+export GIT_VERSION = $(shell git describe --dirty --tags --always)
 export BUILD_DATE := $(shell date -u +'%Y-%m-%dT%H:%M:%SZ')
 
 # define characters
@@ -117,6 +118,8 @@ e2e:
 
 
 .PHONY: release
-RELEASE_ARGS?=release --rm-dist --snapshot
+export OPM_IMAGE_REPO ?= quay.io/operator-framework/opm
+export IMAGE_TAG := $(shell (test "$(shell git describe)" = "$(shell git describe --abbrev=0)" && echo $(shell git describe)) || echo $(shell git branch --show-current))
+release: RELEASE_ARGS?=release --rm-dist --snapshot
 release:
 	./scripts/fetch goreleaser 0.173.2 && ./bin/goreleaser $(RELEASE_ARGS)

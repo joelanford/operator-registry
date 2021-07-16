@@ -1,6 +1,8 @@
 name: release
 on:
   push:
+    branches:
+      - 'master'
     tags:
       - 'v[0-9]+.[0-9]+.[0-9]+'
   pull_request: {}
@@ -19,12 +21,14 @@ jobs:
         with:
           go-version: '~1.16'
 
-      - run: |
+      - name: "Download osxcross cross-compiler for macOS builds"
+        run: |
           git clone https://github.com/tpoechtrager/osxcross /tmp/osxcross
           cd /tmp/osxcross
           wget -P tarballs 'https://www.dropbox.com/s/cklcenl4667il6b/MacOSX11.1.sdk.tar.xz'
 
-      - id: cache-osxcross
+      - name: "Cache the osxcross + tarball build output"
+        id: cache-osxcross
         uses: actions/cache@v2
         with:
           path: /tmp/osxcross/target
@@ -32,14 +36,23 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-osxcross-
 
-      - if: steps.cache-osxcross.outputs.cache-hit != 'true'
+      - name: "Build osxcross"
+        if: steps.cache-osxcross.outputs.cache-hit != 'true'
         run: |
           cd /tmp/osxcross
           sudo ./tools/get_dependencies.sh
           UNATTENDED=1 ./build.sh
           echo "/tmp/osxcross/target/bin" >> $GITHUB_PATH
-      - run: sudo apt-get install -y gcc-aarch64-linux-gnu gcc-s390x-linux-gnu gcc-powerpc64le-linux-gnu gcc-mingw-w64-x86-64
-      - run: make release
+
+      - name: "Install linux cross-compilers"
+        run: sudo apt-get install -y gcc-aarch64-linux-gnu gcc-s390x-linux-gnu gcc-powerpc64le-linux-gnu gcc-mingw-w64-x86-64
+
+      - name: "Disable the Github release upload for non-tag builds"
+        if: !startsWith(github.ref, 'refs/tags')
+        run: yq eval '.release.disable=true' -i .goreleaser.yaml
+
+      - name: "Run GoReleaser"
+        run: make release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          RELEASE_ARGS: release --rm-dist ${{ !startsWith(github.ref, 'refs/tags') && '--snapshot' || '' }}
+          RELEASE_ARGS: release --rm-dist ${{ !startsWith(github.ref, 'refs/tags') && '--skip-validate' || '' }}

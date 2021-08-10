@@ -830,6 +830,167 @@ func TestRender(t *testing.T) {
 			},
 			assertion: require.NoError,
 		},
+		{
+			name: "Success/PackageManifestDirectoryWithImageRefTemplate",
+			render: action.Render{
+				Refs:             []string{"testdata/foo-index-v0.2.0-package-manifest"},
+				ImageRefTemplate: template.Must(template.New("imageRef").Parse("test.registry/{{.Package}}-operator/{{.Package}}:v{{.Version}}")),
+				Registry:         reg,
+			},
+			expectCfg: &declcfg.DeclarativeConfig{
+				Packages: []declcfg.Package{
+					{
+						Schema:         "olm.package",
+						Name:           "foo",
+						DefaultChannel: "stable",
+					},
+				},
+				Channels: []declcfg.Channel{
+					{Schema: "olm.channel", Package: "foo", Name: "beta", Entries: []declcfg.ChannelEntry{
+						{Name: "foo.v0.1.0", SkipRange: "<0.1.0"},
+						{Name: "foo.v0.2.0", Replaces: "foo.v0.1.0", SkipRange: "<0.2.0", Skips: []string{"foo.v0.1.1", "foo.v0.1.2"}},
+					}},
+					{Schema: "olm.channel", Package: "foo", Name: "stable", Entries: []declcfg.ChannelEntry{
+						{Name: "foo.v0.1.0", SkipRange: "<0.1.0"},
+						{Name: "foo.v0.2.0", Replaces: "foo.v0.1.0", SkipRange: "<0.2.0", Skips: []string{"foo.v0.1.1", "foo.v0.1.2"}},
+					}},
+				},
+				Bundles: []declcfg.Bundle{
+					{
+						Schema:  "olm.bundle",
+						Name:    "foo.v0.1.0",
+						Package: "foo",
+						Image:   "test.registry/foo-operator/foo:v0.1.0",
+						Properties: []property.Property{
+							property.MustBuildGVK("test.foo", "v1", "Foo"),
+							property.MustBuildPackage("foo", "0.1.0"),
+							mustBuildCSVMetadata(bytes.NewReader(foov1csv)),
+						},
+						Objects: []string{string(foov1csv), string(foov1crd)},
+						CsvJSON: string(foov1csv),
+						RelatedImages: []declcfg.RelatedImage{
+							{
+								Name:  "operator",
+								Image: "test.registry/foo-operator/foo:v0.1.0",
+							},
+						},
+					},
+					{
+						Schema:  "olm.bundle",
+						Name:    "foo.v0.2.0",
+						Package: "foo",
+						Image:   "test.registry/foo-operator/foo:v0.2.0",
+						Properties: []property.Property{
+							property.MustBuildGVK("test.foo", "v1", "Foo"),
+							property.MustBuildPackage("foo", "0.2.0"),
+							mustBuildCSVMetadata(bytes.NewReader(foov2csv)),
+						},
+						Objects: []string{string(foov2csv), string(foov2crd)},
+						CsvJSON: string(foov2csv),
+						RelatedImages: []declcfg.RelatedImage{
+							{
+								Image: "test.registry/foo-operator/foo-2:v0.2.0",
+							},
+							{
+								Image: "test.registry/foo-operator/foo-init-2:v0.2.0",
+							},
+							{
+								Image: "test.registry/foo-operator/foo-init:v0.2.0",
+							},
+							{
+								Name:  "other",
+								Image: "test.registry/foo-operator/foo-other:v0.2.0",
+							},
+							{
+								Name:  "operator",
+								Image: "test.registry/foo-operator/foo:v0.2.0",
+							},
+						},
+					},
+				},
+			},
+			assertion: require.NoError,
+		},
+		{
+			name: "Success/PackageManifestDirectory",
+			render: action.Render{
+				Refs:     []string{"testdata/foo-index-v0.2.0-package-manifest"},
+				Registry: reg,
+			},
+			expectCfg: &declcfg.DeclarativeConfig{
+				Packages: []declcfg.Package{
+					{
+						Schema:         "olm.package",
+						Name:           "foo",
+						DefaultChannel: "stable",
+					},
+				},
+				Channels: []declcfg.Channel{
+					{Schema: "olm.channel", Package: "foo", Name: "beta", Entries: []declcfg.ChannelEntry{
+						{Name: "foo.v0.1.0", SkipRange: "<0.1.0"},
+						{Name: "foo.v0.2.0", Replaces: "foo.v0.1.0", SkipRange: "<0.2.0", Skips: []string{"foo.v0.1.1", "foo.v0.1.2"}},
+					}},
+					{Schema: "olm.channel", Package: "foo", Name: "stable", Entries: []declcfg.ChannelEntry{
+						{Name: "foo.v0.1.0", SkipRange: "<0.1.0"},
+						{Name: "foo.v0.2.0", Replaces: "foo.v0.1.0", SkipRange: "<0.2.0", Skips: []string{"foo.v0.1.1", "foo.v0.1.2"}},
+					}},
+				},
+				Bundles: []declcfg.Bundle{
+					{
+						Schema:  "olm.bundle",
+						Name:    "foo.v0.1.0",
+						Package: "foo",
+						Properties: []property.Property{
+							property.MustBuildGVK("test.foo", "v1", "Foo"),
+							property.MustBuildPackage("foo", "0.1.0"),
+							property.MustBuildBundleObject(foov1crd),
+							property.MustBuildBundleObject(foov1csv),
+						},
+						Objects: []string{string(foov1csv), string(foov1crd)},
+						CsvJSON: string(foov1csv),
+						RelatedImages: []declcfg.RelatedImage{
+							{
+								Name:  "operator",
+								Image: "test.registry/foo-operator/foo:v0.1.0",
+							},
+						},
+					},
+					{
+						Schema:  "olm.bundle",
+						Name:    "foo.v0.2.0",
+						Package: "foo",
+						Properties: []property.Property{
+							property.MustBuildGVK("test.foo", "v1", "Foo"),
+							property.MustBuildPackage("foo", "0.2.0"),
+							property.MustBuildBundleObject(foov2crd),
+							property.MustBuildBundleObject(foov2csv),
+						},
+						Objects: []string{string(foov2csv), string(foov2crd)},
+						CsvJSON: string(foov2csv),
+						RelatedImages: []declcfg.RelatedImage{
+							{
+								Image: "test.registry/foo-operator/foo-2:v0.2.0",
+							},
+							{
+								Image: "test.registry/foo-operator/foo-init-2:v0.2.0",
+							},
+							{
+								Image: "test.registry/foo-operator/foo-init:v0.2.0",
+							},
+							{
+								Name:  "other",
+								Image: "test.registry/foo-operator/foo-other:v0.2.0",
+							},
+							{
+								Name:  "operator",
+								Image: "test.registry/foo-operator/foo:v0.2.0",
+							},
+						},
+					},
+				},
+			},
+			assertion: require.NoError,
+		},
 	}
 
 	for _, s := range specs {
@@ -884,7 +1045,7 @@ func TestAllowRefMask(t *testing.T) {
 			render: action.Render{
 				Refs:           []string{"test.registry/foo-operator/foo-index-sqlite:v0.2.0"},
 				Registry:       reg,
-				AllowedRefMask: action.RefDCImage | action.RefDCDir | action.RefSqliteFile | action.RefBundleImage | action.RefBundleDir,
+				AllowedRefMask: action.RefDCImage | action.RefDCDir | action.RefSqliteFile | action.RefBundleImage | action.RefBundleDir | action.RefPackageManifestDir,
 			},
 			expectErr: action.ErrNotAllowed,
 		},
@@ -902,7 +1063,7 @@ func TestAllowRefMask(t *testing.T) {
 			render: action.Render{
 				Refs:           []string{dbFile},
 				Registry:       reg,
-				AllowedRefMask: action.RefDCImage | action.RefDCDir | action.RefSqliteImage | action.RefBundleImage | action.RefBundleDir,
+				AllowedRefMask: action.RefDCImage | action.RefDCDir | action.RefSqliteImage | action.RefBundleImage | action.RefBundleDir | action.RefPackageManifestDir,
 			},
 			expectErr: action.ErrNotAllowed,
 		},
@@ -920,7 +1081,7 @@ func TestAllowRefMask(t *testing.T) {
 			render: action.Render{
 				Refs:           []string{"test.registry/foo-operator/foo-index-declcfg:v0.2.0"},
 				Registry:       reg,
-				AllowedRefMask: action.RefDCDir | action.RefSqliteImage | action.RefSqliteFile | action.RefBundleImage | action.RefBundleDir,
+				AllowedRefMask: action.RefDCDir | action.RefSqliteImage | action.RefSqliteFile | action.RefBundleImage | action.RefBundleDir | action.RefPackageManifestDir,
 			},
 			expectErr: action.ErrNotAllowed,
 		},
@@ -938,7 +1099,7 @@ func TestAllowRefMask(t *testing.T) {
 			render: action.Render{
 				Refs:           []string{"testdata/foo-index-v0.2.0-declcfg"},
 				Registry:       reg,
-				AllowedRefMask: action.RefDCImage | action.RefSqliteImage | action.RefSqliteFile | action.RefBundleImage | action.RefBundleDir,
+				AllowedRefMask: action.RefDCImage | action.RefSqliteImage | action.RefSqliteFile | action.RefBundleImage | action.RefBundleDir | action.RefPackageManifestDir,
 			},
 			expectErr: action.ErrNotAllowed,
 		},
@@ -956,7 +1117,7 @@ func TestAllowRefMask(t *testing.T) {
 			render: action.Render{
 				Refs:           []string{"test.registry/foo-operator/foo-bundle:v0.2.0"},
 				Registry:       reg,
-				AllowedRefMask: action.RefDCImage | action.RefDCDir | action.RefSqliteImage | action.RefSqliteFile | action.RefBundleDir,
+				AllowedRefMask: action.RefDCImage | action.RefDCDir | action.RefSqliteImage | action.RefSqliteFile | action.RefBundleDir | action.RefPackageManifestDir,
 			},
 			expectErr: action.ErrNotAllowed,
 		},
@@ -974,7 +1135,25 @@ func TestAllowRefMask(t *testing.T) {
 			render: action.Render{
 				Refs:           []string{"testdata/foo-bundle-v0.2.0"},
 				Registry:       reg,
-				AllowedRefMask: action.RefDCImage | action.RefDCDir | action.RefSqliteImage | action.RefSqliteFile | action.RefBundleImage,
+				AllowedRefMask: action.RefDCImage | action.RefDCDir | action.RefSqliteImage | action.RefSqliteFile | action.RefBundleImage | action.RefPackageManifestDir,
+			},
+			expectErr: action.ErrNotAllowed,
+		},
+		{
+			name: "PackageManifestDir/Allowed",
+			render: action.Render{
+				Refs:           []string{"testdata/foo-index-v0.2.0-package-manifest"},
+				Registry:       reg,
+				AllowedRefMask: action.RefPackageManifestDir,
+			},
+			expectErr: nil,
+		},
+		{
+			name: "PackageManifestDir/NotAllowed",
+			render: action.Render{
+				Refs:           []string{"testdata/foo-index-v0.2.0-package-manifest"},
+				Registry:       reg,
+				AllowedRefMask: action.RefDCImage | action.RefDCDir | action.RefSqliteImage | action.RefSqliteFile | action.RefBundleImage | action.RefBundleDir,
 			},
 			expectErr: action.ErrNotAllowed,
 		},
@@ -1023,6 +1202,7 @@ func TestAllowRefMaskAllowed(t *testing.T) {
 				action.RefSqliteFile,
 				action.RefBundleImage,
 				action.RefBundleDir,
+				action.RefPackageManifestDir,
 			},
 			fail: []action.RefType{},
 		},

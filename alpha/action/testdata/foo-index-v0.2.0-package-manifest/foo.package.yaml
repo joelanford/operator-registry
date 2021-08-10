@@ -1,0 +1,7 @@
+packageName: foo
+defaultChannel: stable
+channels:
+- name: stable
+  currentCSV: foo.v0.2.0
+- name: beta
+  currentCSV: foo.v0.2.0

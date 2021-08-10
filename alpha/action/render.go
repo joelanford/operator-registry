@@ -40,7 +40,9 @@ const (
 	RefSqliteFile
 	RefDCImage
 	RefDCDir
+
 	RefBundleDir
+	RefPackageManifestDir
 
 	RefAll = 0
 )
@@ -143,6 +145,12 @@ func (r Render) renderReference(ctx context.Context, ref string) (*declcfg.Decla
 				return nil, fmt.Errorf("cannot render bundle directory %q: %w", ref, ErrNotAllowed)
 			}
 			return r.renderBundleDirectory(ref)
+		} else if isPackageManifest(dirEntries) {
+			// Looks like a package manifest directory
+			if !r.AllowedRefMask.Allowed(RefPackageManifestDir) {
+				return nil, fmt.Errorf("cannot render package manifest directory: %w", ErrNotAllowed)
+			}
+			return r.renderPackageManifest(ctx, ref)
 		}
 
 		// Otherwise, assume it is a declarative config root directory.
@@ -494,10 +502,88 @@ func isBundle(entries []os.DirEntry) bool {
 	return false
 }
 
+func isPackageManifest(entries []os.DirEntry) bool {
+	for _, e := range entries {
+		if strings.HasSuffix(e.Name(), ".package.yaml") || strings.HasSuffix(e.Name(), ".package.yml") {
+			return true
+		}
+	}
+	return false
+}
+
 type imageReferenceTemplateData struct {
 	Package string
 	Name    string
 	Version string
+}
+
+func (r *Render) renderPackageManifest(ctx context.Context, ref string) (*declcfg.DeclarativeConfig, error) {
+	db, err := sql.Open("sqlite3", fmt.Sprintf("file:%s?mode=memory&cache=shared&_foreign_keys=on", ref))
+	if err != nil {
+		return nil, err
+	}
+	defer db.Close()
+
+	dbLoader, err := sqlite.NewSQLLiteLoader(db)
+	if err != nil {
+		return nil, err
+	}
+	if err := dbLoader.Migrate(ctx); err != nil {
+		return nil, err
+	}
+
+	loader := sqlite.NewSQLLoaderForDirectory(dbLoader, ref)
+	if err := loader.Populate(); err != nil {
+		return nil, fmt.Errorf("error loading manifests from directory: %s", err)
+	}
+
+	if err := r.templateDBImageRefs(ctx, db); err != nil {
+		return nil, fmt.Errorf("error templating image references: %v", err)
+	}
+
+	return sqliteToDeclcfg(ctx, db)
+}
+
+func (r *Render) templateDBImageRefs(ctx context.Context, db *sql.DB) error {
+	if r.ImageRefTemplate == nil {
+		return nil
+	}
+	tx, err := db.BeginTx(ctx, nil)
+	rows, err := tx.QueryContext(ctx, "SELECT DISTINCT en.package_name, op.name, op.version FROM operatorbundle op JOIN channel_entry en ON op.name = en.operatorbundle_name;")
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var (
+			pkgName sql.NullString
+			name    sql.NullString
+			version sql.NullString
+		)
+		if err := rows.Scan(&pkgName, &name, &version); err != nil {
+			return err
+		}
+		if !pkgName.Valid || !name.Valid || !version.Valid {
+			continue
+		}
+		var buf strings.Builder
+		tmplInput := imageReferenceTemplateData{
+			Package: pkgName.String,
+			Name:    name.String,
+			Version: version.String,
+		}
+		if err := r.ImageRefTemplate.Execute(&buf, tmplInput); err != nil {
+			return err
+		}
+		if _, err := tx.ExecContext(ctx, "UPDATE operatorbundle SET bundlePath = ? WHERE name = ?;", buf.String(), name.String); err != nil {
+			if rollbackErr := tx.Rollback(); rollbackErr != nil {
+				return fmt.Errorf("failed to rollback transaction: %v; original error: %v", rollbackErr, err)
+			}
+			return err
+		}
+	}
+	return tx.Commit()
 }
 
 func (r *Render) renderBundleDirectory(ref string) (*declcfg.DeclarativeConfig, error) {

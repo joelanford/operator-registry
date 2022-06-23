@@ -2,13 +2,15 @@ name: goreleaser
 on:
   push:
     branches:
-      - 'master'
+      - '*'
     tags:
       - 'v[0-9]+.[0-9]+.[0-9]+'
   pull_request: {}
 defaults:
   run:
     shell: bash
+env:
+  OPM_IMAGE_REPO: quay.io/joelanford/opm
 jobs:
   release:
     needs:

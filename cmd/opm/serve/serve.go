@@ -27,9 +27,10 @@ import (
 )
 
 type serve struct {
-	configDir string
-	cacheDir  string
-	cacheOnly bool
+	configDir         string
+	cacheDir          string
+	cacheOnly         bool
+	failOutdatedCache bool
 
 	port           string
 	terminationLog string
@@ -59,15 +60,16 @@ startup. Changes made to the declarative config after the this command starts
 will not be reflected in the served content.
 `,
 		Args: cobra.ExactArgs(1),
-		PreRunE: func(_ *cobra.Command, args []string) error {
+		PreRun: func(_ *cobra.Command, args []string) {
 			s.configDir = args[0]
 			if s.debug {
 				logger.SetLevel(logrus.DebugLevel)
 			}
-			return nil
 		},
-		RunE: func(cmd *cobra.Command, _ []string) error {
-			return s.run(cmd.Context())
+		Run: func(cmd *cobra.Command, _ []string) {
+			if err := s.run(cmd.Context()); err != nil {
+				logger.Fatal(err)
+			}
 		},
 	}
 
@@ -77,6 +79,7 @@ will not be reflected in the served content.
 	cmd.Flags().StringVar(&s.pprofAddr, "pprof-addr", "", "address of startup profiling endpoint (addr:port format)")
 	cmd.Flags().StringVar(&s.cacheDir, "cache-dir", "", "if set, sync and persist server cache directory")
 	cmd.Flags().BoolVar(&s.cacheOnly, "cache-only", false, "sync the serve cache and exit without serving")
+	cmd.Flags().BoolVar(&s.failOutdatedCache, "fail-on-outdated-cache", false, "exit with error if cache is not present or is outdated.")
 	return cmd
 }
 
@@ -102,7 +105,7 @@ func (s *serve) run(ctx context.Context) error {
 
 	s.logger = s.logger.WithFields(logrus.Fields{"configs": s.configDir, "port": s.port})
 
-	store, err := registry.NewQuerierFromFS(os.DirFS(s.configDir), s.cacheDir)
+	store, err := registry.NewQuerierFromFS(os.DirFS(s.configDir), s.cacheDir, s.failOutdatedCache)
 	if err != nil {
 		return err
 	}

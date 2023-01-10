@@ -51,8 +51,8 @@ func (s *SliceBundleSender) Send(b *api.Bundle) error {
 
 var _ GRPCQuery = &Querier{}
 
-func NewQuerierFromFS(fbcFS fs.FS, cacheDir string) (*Querier, error) {
-	cache, err := newCache(cacheDir, &fbcCacheModel{
+func NewQuerierFromFS(fbcFS fs.FS, cacheDir string, failOutdatedCache bool) (*Querier, error) {
+	cache, err := newCache(cacheDir, failOutdatedCache, &fbcCacheModel{
 		FBC:   fbcFS,
 		Cache: os.DirFS(cacheDir),
 	})
@@ -63,7 +63,7 @@ func NewQuerierFromFS(fbcFS fs.FS, cacheDir string) (*Querier, error) {
 }
 
 func NewQuerier(m model.Model) (*Querier, error) {
-	cache, err := newCache("", &nonDigestableModel{Model: m})
+	cache, err := newCache("", false, &nonDigestableModel{Model: m})
 	if err != nil {
 		return nil, err
 	}
@@ -402,12 +402,15 @@ type cache struct {
 	apiBundles map[apiBundleKey]string
 }
 
-func newCache(baseDir string, model digestableModel) (*cache, error) {
+func newCache(baseDir string, failOutdated bool, model digestableModel) (*cache, error) {
 	var (
 		qc  *cache
 		err error
 	)
 	if baseDir == "" {
+		if failOutdated {
+			return nil, errors.New("expected existing cache: cache directory was not specified")
+		}
 		qc, err = newEphemeralCache()
 	} else {
 		qc, err = newPersistentCache(baseDir)
@@ -415,7 +418,7 @@ func newCache(baseDir string, model digestableModel) (*cache, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := qc.load(model); err != nil {
+	if err := qc.load(model, failOutdated); err != nil {
 		// try to clean up after ourselves by closing the cache (by cleaning
 		// up any temporary files/directories) before returning the error.
 		_ = qc.close()
@@ -454,26 +457,27 @@ func newPersistentCache(baseDir string) (*cache, error) {
 		return nil, err
 	}
 	qc := &cache{baseDir: baseDir, persist: true}
-	if digest, err := os.ReadFile(filepath.Join(baseDir, "digest")); err == nil {
-		qc.digest = strings.TrimSpace(string(digest))
-	}
 	return qc, nil
 }
 
-func (qc *cache) load(model digestableModel) error {
+func (qc *cache) load(model digestableModel, failOutdated bool) error {
+	existingDigestBytes, err := os.ReadFile(filepath.Join(qc.baseDir, "digest"))
+	if err != nil && failOutdated {
+		return fmt.Errorf("expected existing cache: failed to read digest: %v", err)
+	}
+	existingDigest := strings.TrimSpace(string(existingDigestBytes))
+
 	computedDigest, err := model.GetDigest()
 	if err != nil && !errors.Is(err, errNonDigestable) {
 		return fmt.Errorf("compute digest: %v", err)
 	}
-	if err == nil && computedDigest == qc.digest {
-		err = qc.loadFromCache()
-		if err == nil {
-			return nil
+	if err != nil || computedDigest != existingDigest {
+		if failOutdated {
+			return fmt.Errorf("existing cache is outdated: expected digest %q, but found %q", computedDigest, existingDigest)
 		}
-		// if there _was_ an error loading from the cache,
-		// we'll drop down and repopulate from scratch.
+		return qc.repopulateCache(model)
 	}
-	return qc.repopulateCache(model)
+	return qc.loadFromCache()
 }
 
 func (qc *cache) loadFromCache() error {

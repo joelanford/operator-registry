@@ -1,22 +1,20 @@
-package registry
+package cache
 
 import (
 	"context"
+	"fmt"
 	"io/fs"
-	"os"
+	"strings"
 	"testing"
 	"testing/fstest"
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/operator-framework/operator-registry/alpha/declcfg"
-	"github.com/operator-framework/operator-registry/alpha/model"
-	"github.com/operator-framework/operator-registry/alpha/property"
+	"github.com/operator-framework/operator-registry/pkg/registry"
 )
 
-func TestQuerier_GetBundle(t *testing.T) {
-	for _, testQuerier := range genTestQueriers(t, validFS) {
-		defer testQuerier.Close()
+func TestCache_GetBundle(t *testing.T) {
+	for _, testQuerier := range genTestCaches(t, validFS) {
 		b, err := testQuerier.GetBundle(context.TODO(), "etcd", "singlenamespace-alpha", "etcdoperator.v0.9.4")
 		require.NoError(t, err)
 		require.Equal(t, b.PackageName, "etcd")
@@ -25,9 +23,8 @@ func TestQuerier_GetBundle(t *testing.T) {
 	}
 }
 
-func TestQuerier_GetBundleForChannel(t *testing.T) {
-	for _, testQuerier := range genTestQueriers(t, validFS) {
-		defer testQuerier.Close()
+func TestCache_GetBundleForChannel(t *testing.T) {
+	for _, testQuerier := range genTestCaches(t, validFS) {
 		b, err := testQuerier.GetBundleForChannel(context.TODO(), "etcd", "singlenamespace-alpha")
 		require.NoError(t, err)
 		require.NotNil(t, b)
@@ -37,9 +34,8 @@ func TestQuerier_GetBundleForChannel(t *testing.T) {
 	}
 }
 
-func TestQuerier_GetBundleThatProvides(t *testing.T) {
-	for _, testQuerier := range genTestQueriers(t, validFS) {
-		defer testQuerier.Close()
+func TestCache_GetBundleThatProvides(t *testing.T) {
+	for _, testQuerier := range genTestCaches(t, validFS) {
 		b, err := testQuerier.GetBundleThatProvides(context.TODO(), "etcd.database.coreos.com", "v1beta2", "EtcdBackup")
 		require.NoError(t, err)
 		require.NotNil(t, b)
@@ -49,9 +45,8 @@ func TestQuerier_GetBundleThatProvides(t *testing.T) {
 	}
 }
 
-func TestQuerier_GetBundleThatReplaces(t *testing.T) {
-	for _, testQuerier := range genTestQueriers(t, validFS) {
-		defer testQuerier.Close()
+func TestCache_GetBundleThatReplaces(t *testing.T) {
+	for _, testQuerier := range genTestCaches(t, validFS) {
 		b, err := testQuerier.GetBundleThatReplaces(context.TODO(), "etcdoperator.v0.9.0", "etcd", "singlenamespace-alpha")
 		require.NoError(t, err)
 		require.NotNil(t, b)
@@ -61,13 +56,12 @@ func TestQuerier_GetBundleThatReplaces(t *testing.T) {
 	}
 }
 
-func TestQuerier_GetChannelEntriesThatProvide(t *testing.T) {
-	for _, testQuerier := range genTestQueriers(t, validFS) {
-		defer testQuerier.Close()
+func TestCache_GetChannelEntriesThatProvide(t *testing.T) {
+	for _, testQuerier := range genTestCaches(t, validFS) {
 		entries, err := testQuerier.GetChannelEntriesThatProvide(context.TODO(), "etcd.database.coreos.com", "v1beta2", "EtcdBackup")
 		require.NoError(t, err)
 		require.NotNil(t, entries)
-		require.ElementsMatch(t, []*ChannelEntry{
+		require.ElementsMatch(t, []*registry.ChannelEntry{
 			{
 				PackageName: "etcd",
 				ChannelName: "singlenamespace-alpha",
@@ -108,13 +102,12 @@ func TestQuerier_GetChannelEntriesThatProvide(t *testing.T) {
 	}
 }
 
-func TestQuerier_GetChannelEntriesThatReplace(t *testing.T) {
-	for _, testQuerier := range genTestQueriers(t, validFS) {
-		defer testQuerier.Close()
+func TestCache_GetChannelEntriesThatReplace(t *testing.T) {
+	for _, testQuerier := range genTestCaches(t, validFS) {
 		entries, err := testQuerier.GetChannelEntriesThatReplace(context.TODO(), "etcdoperator.v0.9.0")
 		require.NoError(t, err)
 		require.NotNil(t, entries)
-		require.ElementsMatch(t, []*ChannelEntry{
+		require.ElementsMatch(t, []*registry.ChannelEntry{
 			{
 				PackageName: "etcd",
 				ChannelName: "singlenamespace-alpha",
@@ -131,13 +124,12 @@ func TestQuerier_GetChannelEntriesThatReplace(t *testing.T) {
 	}
 }
 
-func TestQuerier_GetLatestChannelEntriesThatProvide(t *testing.T) {
-	for _, testQuerier := range genTestQueriers(t, validFS) {
-		defer testQuerier.Close()
+func TestCache_GetLatestChannelEntriesThatProvide(t *testing.T) {
+	for _, testQuerier := range genTestCaches(t, validFS) {
 		entries, err := testQuerier.GetLatestChannelEntriesThatProvide(context.TODO(), "etcd.database.coreos.com", "v1beta2", "EtcdBackup")
 		require.NoError(t, err)
 		require.NotNil(t, entries)
-		require.ElementsMatch(t, []*ChannelEntry{
+		require.ElementsMatch(t, []*registry.ChannelEntry{
 			{
 				PackageName: "etcd",
 				ChannelName: "singlenamespace-alpha",
@@ -154,17 +146,16 @@ func TestQuerier_GetLatestChannelEntriesThatProvide(t *testing.T) {
 	}
 }
 
-func TestQuerier_GetPackage(t *testing.T) {
-	for _, testQuerier := range genTestQueriers(t, validFS) {
-		defer testQuerier.Close()
+func TestCache_GetPackage(t *testing.T) {
+	for _, testQuerier := range genTestCaches(t, validFS) {
 		p, err := testQuerier.GetPackage(context.TODO(), "etcd")
 		require.NoError(t, err)
 		require.NotNil(t, p)
 
-		expected := &PackageManifest{
+		expected := &registry.PackageManifest{
 			PackageName:        "etcd",
 			DefaultChannelName: "singlenamespace-alpha",
-			Channels: []PackageChannel{
+			Channels: []registry.PackageChannel{
 				{
 					Name:           "singlenamespace-alpha",
 					CurrentCSVName: "etcdoperator.v0.9.4",
@@ -186,12 +177,16 @@ func TestQuerier_GetPackage(t *testing.T) {
 	}
 }
 
-func TestQuerier_ListBundles(t *testing.T) {
-	for _, testQuerier := range genTestQueriers(t, validFS) {
-		defer testQuerier.Close()
+func TestCache_ListBundles(t *testing.T) {
+	for _, testQuerier := range genTestCaches(t, validFS) {
 		bundles, err := testQuerier.ListBundles(context.TODO())
 		require.NoError(t, err)
 		require.NotNil(t, bundles)
+		bundleNames := make([]string, 0, len(bundles))
+		for _, b := range bundles {
+			bundleNames = append(bundleNames, b.CsvName)
+		}
+		fmt.Println(strings.Join(bundleNames, ","))
 		require.Len(t, bundles, 12)
 		for _, b := range bundles {
 			require.Zero(t, b.CsvJson)
@@ -200,9 +195,8 @@ func TestQuerier_ListBundles(t *testing.T) {
 	}
 }
 
-func TestQuerier_ListPackages(t *testing.T) {
-	for _, testQuerier := range genTestQueriers(t, validFS) {
-		defer testQuerier.Close()
+func TestCache_ListPackages(t *testing.T) {
+	for _, testQuerier := range genTestCaches(t, validFS) {
 		packages, err := testQuerier.ListPackages(context.TODO())
 		require.NoError(t, err)
 		require.NotNil(t, packages)
@@ -210,100 +204,22 @@ func TestQuerier_ListPackages(t *testing.T) {
 	}
 }
 
-func TestQuerier_BadBundleRaisesError(t *testing.T) {
+func genTestCaches(t *testing.T, fbcFS fs.FS) []Cache {
 	t.Helper()
 
-	t.Run("InvalidModel", func(t *testing.T) {
-		// Convert a good FS into a model (we need the model to validate
-		// in the declcfg.ConvertToModel step)
-		cfg, err := declcfg.LoadFS(validFS)
+	caches := []Cache{
+		NewJSON(t.TempDir()),
+		NewBolt(t.TempDir()),
+	}
+
+	for _, c := range caches {
+		err := c.Build(fbcFS)
 		require.NoError(t, err)
-
-		m, err := declcfg.ConvertToModel(*cfg)
+		err = c.Load()
 		require.NoError(t, err)
+	}
 
-		// break the model by adding another package property
-		bundle := func() *model.Bundle {
-			for _, pkg := range m {
-				for _, ch := range pkg.Channels {
-					for _, bundle := range ch.Bundles {
-						return bundle
-					}
-				}
-			}
-			return nil
-		}()
-
-		bundle.Properties = append(bundle.Properties, property.Property{
-			Type:  PackageType,
-			Value: []byte("{\"packageName\": \"another-package\", \"version\": \"1.0.0\"}"),
-		})
-
-		_, err = NewQuerier(m)
-		require.EqualError(t, err, `parse properties: expected exactly 1 property of type "olm.package", found 2`)
-	})
-
-	t.Run("InvalidFS", func(t *testing.T) {
-		_, err := NewQuerierFromFS(badBundleFS, t.TempDir())
-		require.EqualError(t, err, `package "cockroachdb" bundle "cockroachdb.v5.0.3" must have exactly 1 "olm.package" property, found 2`)
-	})
-}
-
-func TestQuerier_NewQuerierFromFS_FailMkdir(t *testing.T) {
-	origTmpDir, tmpDirSet := os.LookupEnv("TMPDIR")
-	tmpDir := t.TempDir()
-	os.Chmod(tmpDir, 0444)
-	require.NoError(t, os.Setenv("TMPDIR", tmpDir))
-	defer func() {
-		if tmpDirSet {
-			require.NoError(t, os.Setenv("TMPDIR", origTmpDir))
-		} else {
-			os.Unsetenv("TMPDIR")
-		}
-	}()
-
-	q, err := NewQuerierFromFS(validFS, "")
-	require.Nil(t, q)
-	require.Error(t, err)
-}
-
-func TestQuerier_NewQuerierFromFS_FailCleanup(t *testing.T) {
-	origTmpDir, tmpDirSet := os.LookupEnv("TMPDIR")
-	tmpDir := t.TempDir()
-	require.NoError(t, os.Setenv("TMPDIR", tmpDir))
-	defer func() {
-		if tmpDirSet {
-			require.NoError(t, os.Setenv("TMPDIR", origTmpDir))
-		} else {
-			os.Unsetenv("TMPDIR")
-		}
-	}()
-
-	q, err := NewQuerierFromFS(badBundleFS, "")
-	require.Nil(t, q)
-	require.Error(t, err)
-
-	tmpDirEntries, err := os.ReadDir(tmpDir)
-	require.Len(t, tmpDirEntries, 0)
-	require.NoError(t, err)
-}
-
-func genTestQueriers(t *testing.T, fbcFS fs.FS) []*Querier {
-	t.Helper()
-
-	cfg, err := declcfg.LoadFS(fbcFS)
-	require.NoError(t, err)
-
-	m, err := declcfg.ConvertToModel(*cfg)
-	require.NoError(t, err)
-
-	fromModel, err := NewQuerier(m)
-	require.NoError(t, err)
-
-	fromFS, err := NewQuerierFromFS(fbcFS, t.TempDir())
-	require.NoError(t, err)
-
-	return []*Querier{fromModel, fromFS}
+	return caches
 }
 
 var validFS = fstest.MapFS{

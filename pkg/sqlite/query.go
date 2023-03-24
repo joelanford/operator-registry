@@ -289,7 +289,7 @@ func (s *SQLQuerier) GetBundle(ctx context.Context, pkgName, channelName, csvNam
 
 func (s *SQLQuerier) GetBundleForChannel(ctx context.Context, pkg string, channel string) (*api.Bundle, error) {
 	query := `
-SELECT operatorbundle.name, operatorbundle.csv FROM operatorbundle INNER JOIN channel
+SELECT operatorbundle.name, operatorbundle.csv, operatorbundle.bundlepath FROM operatorbundle INNER JOIN channel
 ON channel.head_operatorbundle_name = operatorbundle.name
 WHERE channel.name = :channel AND channel.package_name = :package`
 	rows, err := s.db.QueryContext(ctx, query, sql.Named("channel", channel), sql.Named("package", pkg))
@@ -304,14 +304,16 @@ WHERE channel.name = :channel AND channel.package_name = :package`
 	var (
 		name sql.NullString
 		csv  sql.NullString
+		path sql.NullString
 	)
-	if err := rows.Scan(&name, &csv); err != nil {
+	if err := rows.Scan(&name, &csv, &path); err != nil {
 		return nil, err
 	}
 
 	return &api.Bundle{
-		CsvName: name.String,
-		CsvJson: csv.String,
+		CsvName:    name.String,
+		CsvJson:    strings.TrimSpace(csv.String),
+		BundlePath: path.String,
 	}, nil
 }
 

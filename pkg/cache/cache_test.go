@@ -26,9 +26,9 @@ func TestCache_GetBundleForChannel(t *testing.T) {
 		b, err := testQuerier.GetBundleForChannel(context.TODO(), "etcd", "singlenamespace-alpha")
 		require.NoError(t, err)
 		require.NotNil(t, b)
-		require.Equal(t, b.PackageName, "etcd")
-		require.Equal(t, b.ChannelName, "singlenamespace-alpha")
 		require.Equal(t, b.CsvName, "etcdoperator.v0.9.4")
+		require.Equal(t, b.CsvJson, `{"apiVersion":"operators.coreos.com/v1alpha1","kind":"ClusterServiceVersion","metadata":{"name":"etcdoperator.v0.9.4"}}`)
+		require.Equal(t, b.BundlePath, "quay.io/operatorhubio/etcd:v0.9.4")
 	}
 }
 
@@ -529,7 +529,13 @@ var validFS = fstest.MapFS{
                 "kind": "Testapi",
                 "version": "v1"
             }
-        }
+        },
+		{
+			"type": "olm.bundle.object",
+			"value": {
+				"data": "eyJhcGlWZXJzaW9uIjoib3BlcmF0b3JzLmNvcmVvcy5jb20vdjFhbHBoYTEiLCJraW5kIjoiQ2x1c3RlclNlcnZpY2VWZXJzaW9uIiwibWV0YWRhdGEiOnsibmFtZSI6ImV0Y2RvcGVyYXRvci52MC45LjQifX0="
+			}
+		}
     ],
     "relatedImages":[
         {

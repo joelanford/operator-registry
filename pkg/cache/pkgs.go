@@ -66,7 +66,15 @@ func (pkgs packageIndex) GetBundleForChannel(ctx context.Context, c Cache, pkgNa
 	if !ok {
 		return nil, fmt.Errorf("package %q, channel %q not found", pkgName, channelName)
 	}
-	return c.GetBundle(ctx, pkg.Name, ch.Name, ch.Head)
+	b, err := c.GetBundle(ctx, pkg.Name, ch.Name, ch.Head)
+	if err != nil {
+		return nil, err
+	}
+	return &api.Bundle{
+		CsvName:    b.CsvName,
+		CsvJson:    b.CsvJson,
+		BundlePath: b.BundlePath,
+	}, nil
 }
 
 func (pkgs packageIndex) GetBundleThatReplaces(ctx context.Context, c Cache, name, pkgName, channelName string) (*api.Bundle, error) {

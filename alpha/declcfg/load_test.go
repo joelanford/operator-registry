@@ -137,7 +137,7 @@ func TestWalkMetasFS(t *testing.T) {
 	for _, s := range specs {
 		t.Run(s.name, func(t *testing.T) {
 			numPackages, numChannels, numBundles, numDeprecations, numOthers := 0, 0, 0, 0, 0
-			err := WalkMetasFS(s.fsys, func(path string, meta *Meta, err error) error {
+			err := WalkMetasFS(context.Background(), s.fsys, func(path string, meta *Meta, err error) error {
 				if err != nil {
 					return err
 				}

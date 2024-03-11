@@ -25,22 +25,70 @@ const (
 
 type WalkMetasFSFunc func(path string, meta *Meta, err error) error
 
-func WalkMetasFS(root fs.FS, walkFn WalkMetasFSFunc) error {
-	return walkFiles(root, func(root fs.FS, path string, err error) error {
-		if err != nil {
-			return walkFn(path, nil, err)
-		}
+func WalkMetasFS(ctx context.Context, root fs.FS, walkFn WalkMetasFSFunc, opts ...LoadOption) error {
+	if root == nil {
+		return fmt.Errorf("no declarative config filesystem provided")
+	}
 
-		f, err := root.Open(path)
-		if err != nil {
-			return walkFn(path, nil, err)
-		}
-		defer f.Close()
+	options := LoadOptions{
+		concurrency: runtime.NumCPU(),
+	}
+	for _, opt := range opts {
+		opt(&options)
+	}
 
-		return WalkMetasReader(f, func(meta *Meta, err error) error {
-			return walkFn(path, meta, err)
-		})
+	var (
+		pathChan  = make(chan string, options.concurrency)
+		metasChan = make(chan *pathMeta, options.concurrency)
+	)
+
+	// Create an errgroup to manage goroutines. The context is closed when any
+	// goroutine returns an error. Goroutines should check the context
+	// to see if they should return early (in the case of another goroutine
+	// returning an error).
+	eg, ctx := errgroup.WithContext(ctx)
+
+	// Walk the FS and send paths to a channel for parsing.
+	eg.Go(func() error {
+		return sendPaths(ctx, root, pathChan)
 	})
+
+	// Parse paths concurrently. The waitgroup ensures that all paths are parsed
+	// before the cfgChan is closed.
+	var wg sync.WaitGroup
+	for i := 0; i < options.concurrency; i++ {
+		wg.Add(1)
+		eg.Go(func() error {
+			defer wg.Done()
+			return parseMetaPaths(ctx, root, pathChan, metasChan)
+		})
+	}
+
+	eg.Go(func() error {
+		for {
+			select {
+			case <-ctx.Done(): // don't block on receiving from cfgChan
+				return ctx.Err()
+			case pathMetaVal, ok := <-metasChan:
+				if !ok {
+					return nil
+				}
+				if err := walkFn(pathMetaVal.path, pathMetaVal.meta, pathMetaVal.err); err != nil {
+					return err
+				}
+			}
+		}
+	})
+
+	// Wait for all path parsing goroutines to finish before closing cfgChan.
+	wg.Wait()
+	close(metasChan)
+
+	// Wait for all goroutines to finish.
+	if err := eg.Wait(); err != nil {
+		return err
+	}
+	return nil
 }
 
 type WalkMetasReaderFunc func(meta *Meta, err error) error
@@ -213,6 +261,39 @@ func parsePaths(ctx context.Context, root fs.FS, pathChan <-chan string, cfgChan
 			case cfgChan <- cfg:
 			case <-ctx.Done(): // don't block on sending to cfgChan
 				return ctx.Err()
+			}
+		}
+	}
+}
+
+type pathMeta struct {
+	path string
+	meta *Meta
+	err  error
+}
+
+func parseMetaPaths(ctx context.Context, root fs.FS, pathChan <-chan string, metasChan chan<- *pathMeta) error {
+	for {
+		select {
+		case <-ctx.Done(): // don't block on receiving from pathChan
+			return ctx.Err()
+		case path, ok := <-pathChan:
+			if !ok {
+				return nil
+			}
+			file, err := root.Open(path)
+			if err != nil {
+				return err
+			}
+			if err := WalkMetasReader(file, func(meta *Meta, err error) error {
+				select {
+				case metasChan <- &pathMeta{path: path, meta: meta, err: err}:
+				case <-ctx.Done(): // don't block on sending to metasChan
+					return ctx.Err()
+				}
+				return nil
+			}); err != nil {
+				return err
 			}
 		}
 	}

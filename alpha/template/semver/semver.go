@@ -10,7 +10,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/errors"
 	"sigs.k8s.io/yaml"
 
-	"github.com/operator-framework/operator-registry/alpha/action"
 	"github.com/operator-framework/operator-registry/alpha/declcfg"
 	"github.com/operator-framework/operator-registry/alpha/property"
 )
@@ -31,13 +30,7 @@ func (t Template) Render(ctx context.Context) (*declcfg.DeclarativeConfig, error
 	buildBundleList(&sv.Stable.Bundles, &bundleDict)
 
 	for b := range bundleDict {
-		r := action.Render{
-			AllowedRefMask: action.RefBundleImage,
-			Refs:           []string{b},
-			Registry:       t.Registry,
-			Migrations:     t.Migrations,
-		}
-		c, err := r.Run(ctx)
+		c, err := t.RenderBundle(ctx, b)
 		if err != nil {
 			return nil, err
 		}

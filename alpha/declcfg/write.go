@@ -14,6 +14,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/yaml"
 
+	fbcv2 "github.com/operator-framework/operator-registry/alpha/fbc/v2"
 	"github.com/operator-framework/operator-registry/alpha/property"
 )
 
@@ -395,8 +396,27 @@ type encoder interface {
 }
 
 func writeToEncoder(cfg DeclarativeConfig, enc encoder) error {
-	pkgNames := sets.NewString()
+	pkgV2Names := sets.NewString()
+	packagesV2ByName := map[string][]fbcv2.Package{}
+	for _, p := range cfg.PackagesV2 {
+		pkgName := p.Package
+		pkgV2Names.Insert(pkgName)
+		packagesV2ByName[pkgName] = append(packagesV2ByName[pkgName], p)
+	}
+	channelsV2ByPackage := map[string][]fbcv2.Channel{}
+	for _, c := range cfg.ChannelsV2 {
+		pkgName := c.Package
+		pkgV2Names.Insert(pkgName)
+		channelsV2ByPackage[pkgName] = append(channelsV2ByPackage[pkgName], c)
+	}
+	bundlesV2ByPackage := map[string][]fbcv2.Bundle{}
+	for _, b := range cfg.BundlesV2 {
+		pkgName := b.Package
+		pkgV2Names.Insert(pkgName)
+		bundlesV2ByPackage[pkgName] = append(bundlesV2ByPackage[pkgName], b)
+	}
 
+	pkgNames := sets.NewString()
 	packagesByName := map[string][]Package{}
 	for _, p := range cfg.Packages {
 		pkgName := p.Name
@@ -426,6 +446,38 @@ func writeToEncoder(cfg DeclarativeConfig, enc encoder) error {
 		pkgName := d.Package
 		pkgNames.Insert(pkgName)
 		deprecationsByPackage[pkgName] = append(deprecationsByPackage[pkgName], d)
+	}
+
+	for _, pName := range pkgV2Names.List() {
+		if len(pName) == 0 {
+			continue
+		}
+		pkgs := packagesV2ByName[pName]
+		for _, p := range pkgs {
+			if err := enc.Encode(p); err != nil {
+				return err
+			}
+		}
+
+		channels := channelsV2ByPackage[pName]
+		sort.Slice(channels, func(i, j int) bool {
+			return channels[i].Name < channels[j].Name
+		})
+		for _, c := range channels {
+			if err := enc.Encode(c); err != nil {
+				return err
+			}
+		}
+
+		bundles := bundlesV2ByPackage[pName]
+		sort.Slice(bundles, func(i, j int) bool {
+			return bundles[i].Name < bundles[j].Name
+		})
+		for _, b := range bundles {
+			if err := enc.Encode(b); err != nil {
+				return err
+			}
+		}
 	}
 
 	for _, pName := range pkgNames.List() {
@@ -499,6 +551,15 @@ func writeToEncoder(cfg DeclarativeConfig, enc encoder) error {
 type WriteFunc func(config DeclarativeConfig, w io.Writer) error
 
 func WriteFS(cfg DeclarativeConfig, rootDir string, writeFunc WriteFunc, fileExt string) error {
+	channelsV2ByPackage := map[string][]fbcv2.Channel{}
+	for _, c := range cfg.ChannelsV2 {
+		channelsV2ByPackage[c.Package] = append(channelsV2ByPackage[c.Package], c)
+	}
+	bundlesV2ByPackage := map[string][]fbcv2.Bundle{}
+	for _, b := range cfg.BundlesV2 {
+		bundlesV2ByPackage[b.Package] = append(bundlesV2ByPackage[b.Package], b)
+	}
+
 	channelsByPackage := map[string][]Channel{}
 	for _, c := range cfg.Channels {
 		channelsByPackage[c.Package] = append(channelsByPackage[c.Package], c)
@@ -510,6 +571,22 @@ func WriteFS(cfg DeclarativeConfig, rootDir string, writeFunc WriteFunc, fileExt
 
 	if err := os.MkdirAll(rootDir, 0777); err != nil {
 		return err
+	}
+
+	for _, p := range cfg.PackagesV2 {
+		fcfg := DeclarativeConfig{
+			PackagesV2: []fbcv2.Package{p},
+			ChannelsV2: channelsV2ByPackage[p.Package],
+			BundlesV2:  bundlesV2ByPackage[p.Package],
+		}
+		pkgDir := filepath.Join(rootDir, p.Package)
+		if err := os.MkdirAll(pkgDir, 0777); err != nil {
+			return err
+		}
+		filename := filepath.Join(pkgDir, fmt.Sprintf("catalog.v2%s", fileExt))
+		if err := writeFile(fcfg, filename, writeFunc); err != nil {
+			return err
+		}
 	}
 
 	for _, p := range cfg.Packages {

@@ -6,13 +6,13 @@ import (
 	"errors"
 	"fmt"
 
-	prettyunmarshaler "github.com/operator-framework/operator-registry/pkg/prettyunmarshaler"
-
 	"golang.org/x/text/cases"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 
+	fbcv2 "github.com/operator-framework/operator-registry/alpha/fbc/v2"
 	"github.com/operator-framework/operator-registry/alpha/property"
+	prettyunmarshaler "github.com/operator-framework/operator-registry/pkg/prettyunmarshaler"
 )
 
 const (
@@ -28,6 +28,11 @@ type DeclarativeConfig struct {
 	Bundles      []Bundle
 	Deprecations []Deprecation
 	Others       []Meta
+
+	PackagesV2 []fbcv2.Package
+	ChannelsV2 []fbcv2.Channel
+	BundlesV2  []fbcv2.Bundle
+	IconsV2    []fbcv2.Icon
 }
 
 type Package struct {
@@ -201,6 +206,10 @@ func extractUniqueMetaKeys(blobMap map[string]any, m *Meta) error {
 }
 
 func (destination *DeclarativeConfig) Merge(src *DeclarativeConfig) {
+	destination.PackagesV2 = append(destination.PackagesV2, src.PackagesV2...)
+	destination.ChannelsV2 = append(destination.ChannelsV2, src.ChannelsV2...)
+	destination.BundlesV2 = append(destination.BundlesV2, src.BundlesV2...)
+
 	destination.Packages = append(destination.Packages, src.Packages...)
 	destination.Channels = append(destination.Channels, src.Channels...)
 	destination.Bundles = append(destination.Bundles, src.Bundles...)

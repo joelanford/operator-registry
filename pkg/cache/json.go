@@ -13,6 +13,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 
+	"github.com/operator-framework/operator-registry/internal/util/tar"
 	"github.com/operator-framework/operator-registry/pkg/api"
 	"github.com/operator-framework/operator-registry/pkg/registry"
 )
@@ -149,12 +150,12 @@ func (q *jsonBackend) ComputeDigest(_ context.Context, fbcFsys fs.FS) (string, e
 	// For simplicity, do the same as io.Copy() would.
 	buf := make([]byte, 32*1024)
 	computedHasher := fnv.New64a()
-	if err := fsToTar(computedHasher, fbcFsys, buf); err != nil {
+	if err := tar.WriteFS(computedHasher, fbcFsys, buf); err != nil {
 		return "", err
 	}
 
 	if cacheFS, err := fs.Sub(os.DirFS(q.baseDir), jsonDir); err == nil {
-		if err := fsToTar(computedHasher, cacheFS, buf); err != nil && !errors.Is(err, os.ErrNotExist) {
+		if err := tar.WriteFS(computedHasher, cacheFS, buf); err != nil && !errors.Is(err, os.ErrNotExist) {
 			return "", fmt.Errorf("compute hash: %v", err)
 		}
 	}

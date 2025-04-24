@@ -32,8 +32,13 @@ func init() {
 	extractCmd.Flags().StringP("configmapname", "c", "", "name of configmap to write bundle data")
 	extractCmd.Flags().StringP("namespace", "n", "openshift-operator-lifecycle-manager", "namespace to write configmap data")
 	extractCmd.Flags().Uint64P("datalimit", "l", 1<<20, "maximum limit in bytes for total bundle data")
-	extractCmd.Flags().BoolP("gzip", "z", false, "enable gzip compression of configmap data")
+	extractCmd.Flags().StringP("encoding", "e", "", fmt.Sprintf(`encoding to use for writing configmap data. options are ["", %q, %q]`, configmap.ConfigMapEncodingAnnotationGzip, configmap.ConfigMapEncodingAnnotationTarGzip))
 	_ = extractCmd.MarkPersistentFlagRequired("configmapname")
+
+	extractCmd.Flags().BoolP("gzip", "z", false, "enable gzip compression of configmap data")
+	extractCmd.Flags().MarkDeprecated("gzip", "use --encoding instead")
+	extractCmd.MarkFlagsMutuallyExclusive("gzip", "encoding")
+
 }
 
 func runExtractCmd(cmd *cobra.Command, _ []string) error {
@@ -57,12 +62,22 @@ func runExtractCmd(cmd *cobra.Command, _ []string) error {
 	if err != nil {
 		return err
 	}
-	gzip, err := cmd.Flags().GetBool("gzip")
+	encoding, err := cmd.Flags().GetString("encoding")
 	if err != nil {
 		return err
 	}
 
-	loader := configmap.NewConfigMapLoader(configmapName, namespace, manifestsDir, gzip, kubeconfig)
+	if cmd.Flags().Changed("gzip") {
+		gzip, err := cmd.Flags().GetBool("gzip")
+		if err != nil {
+			return err
+		}
+		if gzip {
+			encoding = configmap.ConfigMapEncodingAnnotationGzip
+		}
+	}
+
+	loader := configmap.NewConfigMapLoader(configmapName, namespace, manifestsDir, encoding, kubeconfig)
 	if err := loader.Populate(datalimit); err != nil {
 		return fmt.Errorf("error loading manifests from directory: %s", err)
 	}

@@ -1,4 +1,4 @@
-package cache
+package tar
 
 import (
 	"archive/tar"
@@ -9,11 +9,11 @@ import (
 	"time"
 )
 
-// fsToTar writes the filesystem represented by fsys to w as a tar archive.
+// WriteFS writes the filesystem represented by fsys to w as a tar archive.
 // This function unsets user and group information in the tar archive so that readers
 // of archives produced by this function do not need to account for differences in
 // permissions between source and destination filesystems.
-func fsToTar(w io.Writer, fsys fs.FS, buf []byte) error {
+func WriteFS(w io.Writer, fsys fs.FS, buf []byte) error {
 	if len(buf) == 0 {
 		// We are not sensitive to the size of this buffer, we just need it to be shared.
 		// For simplicity, do the same as io.Copy() would.

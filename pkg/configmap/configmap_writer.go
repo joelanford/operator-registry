@@ -1,9 +1,12 @@
 package configmap
 
 import (
+	"bytes"
+	"compress/gzip"
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 	"regexp"
 
 	"github.com/sirupsen/logrus"
@@ -13,6 +16,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"sigs.k8s.io/yaml"
 
+	"github.com/operator-framework/operator-registry/internal/util/tar"
 	"github.com/operator-framework/operator-registry/pkg/client"
 	"github.com/operator-framework/operator-registry/pkg/lib/bundle"
 	"github.com/operator-framework/operator-registry/pkg/lib/encoding"
@@ -22,10 +26,11 @@ import (
 var unallowedKeyChars = regexp.MustCompile("[^-A-Za-z0-9_.]")
 
 const (
-	EnvContainerImage               = "CONTAINER_IMAGE"
-	ConfigMapImageAnnotationKey     = "olm.sourceImage"
-	ConfigMapEncodingAnnotationKey  = "olm.contentEncoding"
-	ConfigMapEncodingAnnotationGzip = "gzip+base64"
+	EnvContainerImage                  = "CONTAINER_IMAGE"
+	ConfigMapImageAnnotationKey        = "olm.sourceImage"
+	ConfigMapEncodingAnnotationKey     = "olm.contentEncoding"
+	ConfigMapEncodingAnnotationGzip    = "gzip+base64"
+	ConfigMapEncodingAnnotationTarGzip = "tar+gzip"
 )
 
 type AnnotationsFile struct {
@@ -44,25 +49,25 @@ type ConfigMapWriter struct {
 	manifestsDir  string
 	configMapName string
 	namespace     string
-	gzip          bool
+	encoding      string
 }
 
-func NewConfigMapLoader(configMapName, namespace, manifestsDir string, gzip bool, kubeconfig string) *ConfigMapWriter {
+func NewConfigMapLoader(configMapName, namespace, manifestsDir, encoding, kubeconfig string) *ConfigMapWriter {
 	clientset, err := client.NewKubeClient(kubeconfig, logrus.StandardLogger())
 	if err != nil {
 		logrus.Fatalf("cluster config failed: %v", err)
 	}
 
-	return NewConfigMapLoaderWithClient(configMapName, namespace, manifestsDir, gzip, clientset)
+	return NewConfigMapLoaderWithClient(configMapName, namespace, manifestsDir, encoding, clientset)
 }
 
-func NewConfigMapLoaderWithClient(configMapName, namespace, manifestsDir string, gzip bool, clientset kubernetes.Interface) *ConfigMapWriter {
+func NewConfigMapLoaderWithClient(configMapName, namespace, manifestsDir, encoding string, clientset kubernetes.Interface) *ConfigMapWriter {
 	return &ConfigMapWriter{
 		clientset:     clientset,
 		manifestsDir:  manifestsDir,
 		configMapName: configMapName,
 		namespace:     namespace,
-		gzip:          gzip,
+		encoding:      encoding,
 	}
 }
 
@@ -72,82 +77,55 @@ func TranslateInvalidChars(input string) string {
 }
 
 func (c *ConfigMapWriter) Populate(maxDataSizeLimit uint64) error {
-	subDirs := []string{"manifests/", "metadata/"}
-
 	configMapPopulate, err := c.clientset.CoreV1().ConfigMaps(c.namespace).Get(context.TODO(), c.configMapName, metav1.GetOptions{})
 	if err != nil {
 		return err
 	}
 	configMapPopulate.Data = map[string]string{}
 	configMapPopulate.BinaryData = map[string][]byte{}
+	log := logrus.NewEntry(logrus.StandardLogger())
 
-	var totalSize uint64
-	for _, dir := range subDirs {
-		completePath := c.manifestsDir + dir
-		files, err := os.ReadDir(completePath)
-		if err != nil {
-			logrus.Errorf("read dir failed: %v", err)
+	metadataSubDir := filepath.Join(c.manifestsDir, "metadata")
+	annotationsData, err := os.ReadFile(filepath.Join(metadataSubDir, bundle.AnnotationsFile))
+	if err != nil && !os.IsNotExist(err) {
+		return err
+	}
+
+	if len(annotationsData) > 0 {
+		var annotationsFile AnnotationsFile
+		if err := yaml.Unmarshal(annotationsData, &annotationsFile); err != nil {
 			return err
 		}
+		configMapPopulate.SetAnnotations(map[string]string{
+			bundle.ManifestsLabel:      annotationsFile.Annotations.Resources,
+			bundle.MediatypeLabel:      annotationsFile.Annotations.MediaType,
+			bundle.MetadataLabel:       annotationsFile.Annotations.Metadata,
+			bundle.PackageLabel:        annotationsFile.Annotations.Package,
+			bundle.ChannelsLabel:       annotationsFile.Annotations.Channels,
+			bundle.ChannelDefaultLabel: annotationsFile.Annotations.ChannelDefault,
+		})
+	}
+	var totalSize uint64
+	switch c.encoding {
+	case "", ConfigMapEncodingAnnotationGzip:
+		gzipEntries := c.encoding == ConfigMapEncodingAnnotationGzip
+		totalSize, err = c.populateEntries(configMapPopulate, gzipEntries, log)
+	case ConfigMapEncodingAnnotationTarGzip:
+		totalSize, err = c.populateTarGz(configMapPopulate)
+	default:
+		return fmt.Errorf("unknown encoding %q", c.encoding)
+	}
+	if err != nil {
+		return err
+	}
 
-		for _, file := range files {
-			log := logrus.WithField("file", completePath+file.Name())
-			log.Info("Reading file")
+	if c.encoding != "" {
+		setEncodingAnnotation(configMapPopulate, c.encoding)
+	}
 
-			content, err := os.ReadFile(completePath + file.Name())
-			if err != nil {
-				log.Errorf("read failed: %v", err)
-				return err
-			}
-
-			if file.Name() == bundle.AnnotationsFile {
-				var annotationsFile AnnotationsFile
-				err := yaml.Unmarshal(content, &annotationsFile)
-				if err != nil {
-					return err
-				}
-				configMapPopulate.SetAnnotations(map[string]string{
-					bundle.ManifestsLabel:      annotationsFile.Annotations.Resources,
-					bundle.MediatypeLabel:      annotationsFile.Annotations.MediaType,
-					bundle.MetadataLabel:       annotationsFile.Annotations.Metadata,
-					bundle.PackageLabel:        annotationsFile.Annotations.Package,
-					bundle.ChannelsLabel:       annotationsFile.Annotations.Channels,
-					bundle.ChannelDefaultLabel: annotationsFile.Annotations.ChannelDefault,
-				})
-
-				// annotations aren't accounted for the ConfigMap data size
-				// limit, and rather have their own limit of 262144 bytes.
-				continue
-			}
-
-			if c.gzip {
-				content, err = encoding.GzipBase64Encode(content)
-				if err != nil {
-					log.Errorf("failed to gzip encode file %v: %v", file.Name(), err)
-					return err
-				}
-			}
-
-			totalSize += uint64(len(content))
-			if totalSize > maxDataSizeLimit {
-				log.Errorf("Bundle files exceeded %v bytes limit", maxDataSizeLimit)
-				return fmt.Errorf("bundle files exceeded %v bytes limit", maxDataSizeLimit)
-			}
-
-			validConfigMapKey := TranslateInvalidChars(file.Name())
-			if validConfigMapKey != file.Name() {
-				logrus.WithFields(logrus.Fields{
-					"file.Name":         file.Name(),
-					"validConfigMapKey": validConfigMapKey,
-				}).Info("translated filename for configmap compatibility")
-			}
-
-			if c.gzip {
-				configMapPopulate.BinaryData[validConfigMapKey] = content
-			} else {
-				configMapPopulate.Data[validConfigMapKey] = string(content)
-			}
-		}
+	if totalSize > maxDataSizeLimit {
+		log.Errorf("Bundle files totall %d bytes, which exceeds limit of %d", totalSize, maxDataSizeLimit)
+		return fmt.Errorf("bundle files total %d bytes, which exceeds limit of %d", totalSize, maxDataSizeLimit)
 	}
 
 	if sourceImage := os.Getenv(EnvContainerImage); sourceImage != "" {
@@ -155,15 +133,73 @@ func (c *ConfigMapWriter) Populate(maxDataSizeLimit uint64) error {
 		annotations[ConfigMapImageAnnotationKey] = sourceImage
 	}
 
-	if c.gzip {
-		setGzipEncodingAnnotation(configMapPopulate)
-	}
-
-	_, err = c.clientset.CoreV1().ConfigMaps(c.namespace).Update(context.TODO(), configMapPopulate, metav1.UpdateOptions{})
-	if err != nil {
+	if _, err := c.clientset.CoreV1().ConfigMaps(c.namespace).Update(context.TODO(), configMapPopulate, metav1.UpdateOptions{}); err != nil {
 		return err
 	}
 	return nil
+}
+
+func (c *ConfigMapWriter) populateTarGz(configMapPopulate *corev1.ConfigMap) (uint64, error) {
+	var buf bytes.Buffer
+	if err := func() error {
+		gzw := gzip.NewWriter(&buf)
+		defer gzw.Close()
+		return tar.WriteFS(gzw, os.DirFS(c.manifestsDir), nil)
+	}(); err != nil {
+		return 0, err
+	}
+	configMapPopulate.BinaryData["content"] = buf.Bytes()
+	return uint64(buf.Len()), nil
+}
+
+func (c *ConfigMapWriter) populateEntries(configMapPopulate *corev1.ConfigMap, gzip bool, log *logrus.Entry) (uint64, error) {
+	var totalSize uint64
+
+	manifestsSubDir := "manifests"
+	dir := filepath.Join(c.manifestsDir, manifestsSubDir)
+	files, err := os.ReadDir(dir)
+	if err != nil {
+		logrus.Errorf("read dir failed: %v", err)
+		return 0, err
+	}
+
+	for _, file := range files {
+		filePath := filepath.Join(dir, file.Name())
+		log := log.WithField("file", filePath)
+		log.Info("Reading file")
+
+		content, err := os.ReadFile(filePath)
+		if err != nil {
+			log.Errorf("read failed: %v", err)
+			return 0, err
+		}
+
+		if gzip {
+			content, err = encoding.GzipBase64Encode(content)
+			if err != nil {
+				log.Errorf("failed to gzip encode file %v: %v", filePath, err)
+				return 0, err
+			}
+		}
+
+		totalSize += uint64(len(content))
+
+		key := file.Name()
+		validConfigMapKey := TranslateInvalidChars(key)
+		if validConfigMapKey != key {
+			logrus.WithFields(logrus.Fields{
+				"file.Name":         key,
+				"validConfigMapKey": validConfigMapKey,
+			}).Info("translated filename for configmap compatibility")
+		}
+
+		if gzip {
+			configMapPopulate.BinaryData[validConfigMapKey] = content
+		} else {
+			configMapPopulate.Data[validConfigMapKey] = string(content)
+		}
+	}
+	return totalSize, nil
 }
 
 // LaunchBundleImage will launch a bundle image and also create a configmap for
@@ -256,9 +292,9 @@ func LaunchBundleImage(kubeclient kubernetes.Interface, bundleImage, initImage, 
 	return newConfigMap, launchedJob, nil
 }
 
-func setGzipEncodingAnnotation(cm *corev1.ConfigMap) {
+func setEncodingAnnotation(cm *corev1.ConfigMap, encoding string) {
 	annotations := initAndGetAnnotations(cm)
-	annotations[ConfigMapEncodingAnnotationKey] = ConfigMapEncodingAnnotationGzip
+	annotations[ConfigMapEncodingAnnotationKey] = encoding
 }
 
 func hasGzipEncodingAnnotation(cm *corev1.ConfigMap) bool {

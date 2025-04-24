@@ -15,20 +15,21 @@ import (
 )
 
 const (
-	DefaultPermission   = 0644
-	RegistryV1Type      = "registry+v1"
-	PlainType           = "plain"
-	HelmType            = "helm"
-	AnnotationsFile     = "annotations.yaml"
-	DockerFile          = "bundle.Dockerfile"
-	ManifestsDir        = "manifests/"
-	MetadataDir         = "metadata/"
-	ManifestsLabel      = "operators.operatorframework.io.bundle.manifests.v1"
-	MetadataLabel       = "operators.operatorframework.io.bundle.metadata.v1"
-	MediatypeLabel      = "operators.operatorframework.io.bundle.mediatype.v1"
-	PackageLabel        = "operators.operatorframework.io.bundle.package.v1"
-	ChannelsLabel       = "operators.operatorframework.io.bundle.channels.v1"
-	ChannelDefaultLabel = "operators.operatorframework.io.bundle.channel.default.v1"
+	DefaultPermission       = 0644
+	RegistryV1Type          = "registry+v1"
+	PlainType               = "plain"
+	HelmType                = "helm"
+	AnnotationsFile         = "annotations.yaml"
+	DockerFile              = "bundle.Dockerfile"
+	ManifestsDir            = "manifests/"
+	MetadataDir             = "metadata/"
+	ManifestsLabel          = "operators.operatorframework.io.bundle.manifests.v1"
+	ArbitraryManifestsLabel = "operators.operatorframework.io.bundle.arbitrary.manifests.v1"
+	MetadataLabel           = "operators.operatorframework.io.bundle.metadata.v1"
+	MediatypeLabel          = "operators.operatorframework.io.bundle.mediatype.v1"
+	PackageLabel            = "operators.operatorframework.io.bundle.package.v1"
+	ChannelsLabel           = "operators.operatorframework.io.bundle.channels.v1"
+	ChannelDefaultLabel     = "operators.operatorframework.io.bundle.channel.default.v1"
 )
 
 type AnnotationMetadata struct {

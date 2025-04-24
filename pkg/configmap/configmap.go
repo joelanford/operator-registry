@@ -1,12 +1,18 @@
 package configmap
 
 import (
+	"archive/tar"
+	"bytes"
+	"compress/gzip"
 	"errors"
 	"fmt"
+	"io"
 	"maps"
+	"os"
 	"slices"
 	"strings"
 
+	"github.com/containers/storage/pkg/archive"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 
@@ -59,13 +65,23 @@ func loadBundle(entry *logrus.Entry, cm *corev1.ConfigMap) (*api.Bundle, map[str
 	skipped := map[string]string{}
 
 	data := cm.Data
-	if hasGzipEncodingAnnotation(cm) {
-		entry.Debug("Decoding gzip-encoded bundle data")
-
-		var err error
-		data, err = decodeGzipBinaryData(cm)
-		if err != nil {
-			return nil, nil, err
+	encoding, ok := data[ConfigMapEncodingAnnotationKey]
+	if ok {
+		switch encoding {
+		case ConfigMapEncodingAnnotationGzip:
+			entry.Debug("Decoding gzip-encoded bundle data")
+			var err error
+			data, err = decodeGzipBinaryData(cm)
+			if err != nil {
+				return nil, nil, err
+			}
+		case ConfigMapEncodingAnnotationTarGzip:
+			entry.Debug("Decoding tgz-encoded bundle data")
+			var err error
+			data, err = decodeTarGzBinaryData(cm)
+			if err != nil {
+				return nil, nil, err
+			}
 		}
 	}
 
@@ -101,6 +117,44 @@ func loadBundle(entry *logrus.Entry, cm *corev1.ConfigMap) (*api.Bundle, map[str
 	}
 
 	return bundle, skipped, nil
+}
+
+func decodeTarGzBinaryData(cm *corev1.ConfigMap) (map[string]string, error) {
+	tmpDir, err := os.MkdirTemp("", "bundle-tar-gzip-*")
+	if err != nil {
+		return nil, err
+	}
+	defer os.RemoveAll(tmpDir)
+
+	dataBuf := &bytes.Buffer{}
+	bytesBuf := make([]byte, 32*1024)
+
+	data := make(map[string]string)
+	gzr, err := gzip.NewReader()
+	if err != nil {
+		return nil, err
+	}
+
+	defer gzr.Close()
+	tarReader := tar.NewReader(gzr)
+	for {
+		header, err := tarReader.Next()
+		if errors.Is(err, io.EOF) {
+			break
+		}
+		if err != nil {
+			return nil, err
+		}
+		if header.Typeflag != tar.TypeReg {
+			continue
+		}
+		dataBuf.Reset()
+		if _, err := io.CopyBuffer(dataBuf, tarReader, bytesBuf); err != nil {
+			return nil, err
+		}
+		data[header.Name] = dataBuf.String()
+	}
+	return data, nil
 }
 
 func decodeGzipBinaryData(cm *corev1.ConfigMap) (map[string]string, error) {

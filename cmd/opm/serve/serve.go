@@ -13,12 +13,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/logging"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"google.golang.org/grpc"
 	health "google.golang.org/grpc/health/grpc_health_v1"
-	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/reflection"
 
 	"github.com/operator-framework/operator-registry/pkg/api"
@@ -26,6 +24,7 @@ import (
 	"github.com/operator-framework/operator-registry/pkg/lib/dns"
 	"github.com/operator-framework/operator-registry/pkg/lib/log"
 	"github.com/operator-framework/operator-registry/pkg/server"
+	"github.com/operator-framework/operator-registry/pkg/server/interceptor"
 )
 
 type serve struct {
@@ -150,21 +149,49 @@ func (s *serve) run(ctx context.Context) error {
 		}
 	}
 
+	digest, err := store.Digest(ctx)
+	if err != nil {
+		return fmt.Errorf("could not get cache digest: %v", err)
+	}
+
 	if s.cacheOnly {
 		return nil
 	}
 
-	mainLogger = mainLogger.WithFields(logrus.Fields{"port": s.port})
+	mainLogger = mainLogger.WithFields(logrus.Fields{"port": s.port, "digest": digest})
 
 	lis, err := net.Listen("tcp", ":"+s.port)
 	if err != nil {
 		return fmt.Errorf("failed to listen: %s", err)
 	}
 
-	streamLogger, unaryLogger := loggingInterceptors(s.logger.Dup())
 	grpcServer := grpc.NewServer(
-		grpc.ChainStreamInterceptor(streamLogger),
-		grpc.ChainUnaryInterceptor(unaryLogger),
+		grpc.ChainStreamInterceptor(
+			// Setting the cache digest metadata needs to come before logging because the metadata needs to
+			// exist in the context that logging sees.
+			interceptor.StreamSetCacheDigest(digest),
+
+			// Cache interceptor needs to come before logging because logging expects a server implementation
+			// to be called. Cache interceptor switches to a noop server implementation for cache hits to
+			// fulfil logging's needs.
+			interceptor.StreamCache(digest),
+
+			// Log the request and response
+			interceptor.StreamRequestLogger(s.logger), interceptor.StreamResponseLogger(s.logger),
+		),
+		grpc.ChainUnaryInterceptor(
+			// Setting the cache digest metadata needs to come before logging because the metadata needs to
+			// exist in the context that logging sees.
+			interceptor.UnarySetCacheDigest(digest),
+
+			// Log the request and response
+			interceptor.UnaryRequestLogger(s.logger), interceptor.UnaryResponseLogger(s.logger),
+
+			// The unary cache interceptor directly returns an empty response without delegating to handlers
+			// lower in the chain, so it needs to come _after_ the logging handlers. Otherwise, we wouldn't log
+			// requests for cache hits.
+			interceptor.UnaryCache(digest),
+		),
 	)
 	api.RegisterRegistryServer(grpcServer, server.NewRegistryServer(store))
 	health.RegisterHealthServer(grpcServer, server.NewHealthServer())
@@ -305,49 +332,4 @@ func (p *profilerInterface) setCacheReady() {
 	p.cacheLock.Lock()
 	p.cacheReady = true
 	p.cacheLock.Unlock()
-}
-
-func loggingInterceptors(logger *logrus.Entry) (grpc.StreamServerInterceptor, grpc.UnaryServerInterceptor) {
-	requestLogger := logger.Dup()
-	requestLoggerOpts := []logging.Option{
-		logging.WithLogOnEvents(logging.StartCall, logging.FinishCall),
-		logging.WithFieldsFromContext(func(ctx context.Context) logging.Fields {
-			fields := logging.ExtractFields(ctx)
-			metadataFields := logging.Fields{}
-			if md, ok := metadata.FromIncomingContext(ctx); ok {
-				for k, v := range md {
-					metadataFields = append(metadataFields, k, v)
-				}
-				fields = fields.AppendUnique(metadataFields)
-			}
-			return fields
-		}),
-	}
-	return logging.StreamServerInterceptor(interceptorLogger(requestLogger), requestLoggerOpts...),
-		logging.UnaryServerInterceptor(interceptorLogger(requestLogger), requestLoggerOpts...)
-}
-
-func interceptorLogger(l *logrus.Entry) logging.Logger {
-	return logging.LoggerFunc(func(_ context.Context, lvl logging.Level, msg string, fields ...any) {
-		f := make(map[string]any, len(fields)/2)
-		i := logging.Fields(fields).Iterator()
-		for i.Next() {
-			k, v := i.At()
-			f[k] = v
-		}
-		l := l.WithFields(f)
-
-		switch lvl {
-		case logging.LevelDebug:
-			l.Debug(msg)
-		case logging.LevelInfo:
-			l.Info(msg)
-		case logging.LevelWarn:
-			l.Warn(msg)
-		case logging.LevelError:
-			l.Error(msg)
-		default:
-			panic(fmt.Sprintf("unknown level %v", lvl))
-		}
-	})
 }

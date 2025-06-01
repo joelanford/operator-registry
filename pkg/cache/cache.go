@@ -24,9 +24,10 @@ import (
 type Cache interface {
 	registry.GRPCQuery
 
+	Digest(ctx context.Context) (string, error)
 	CheckIntegrity(ctx context.Context, fbc fs.FS) error
 	Build(ctx context.Context, fbc fs.FS) error
-	Load(ctc context.Context) error
+	Load(ctx context.Context) error
 	Close() error
 }
 
@@ -181,6 +182,10 @@ func (c *cache) SendBundles(ctx context.Context, stream registry.BundleSender) e
 		}
 	}
 	return c.backend.SendBundles(ctx, &transformingBundleSender{stream, transform})
+}
+
+func (c *cache) Digest(ctx context.Context) (string, error) {
+	return c.backend.GetDigest(ctx)
 }
 
 func (c *cache) ListBundles(ctx context.Context) ([]*api.Bundle, error) {

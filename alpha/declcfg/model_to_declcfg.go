@@ -2,6 +2,7 @@ package declcfg
 
 import (
 	"sort"
+	"time"
 
 	"github.com/operator-framework/operator-registry/alpha/model"
 	"github.com/operator-framework/operator-registry/alpha/property"
@@ -24,11 +25,12 @@ func ConvertFromModel(mpkgs model.Model) DeclarativeConfig {
 			defaultChannel = mpkg.DefaultChannel.Name
 		}
 		cfg.Packages = append(cfg.Packages, Package{
-			Schema:         SchemaPackage,
-			Name:           mpkg.Name,
-			DefaultChannel: defaultChannel,
-			Icon:           i,
-			Description:    mpkg.Description,
+			Schema:            SchemaPackage,
+			Name:              mpkg.Name,
+			DefaultChannel:    defaultChannel,
+			Icon:              i,
+			Description:       mpkg.Description,
+			VersionLifecycles: convertVersionLifecyclesFromModel(mpkg.VersionLifecycles),
 		})
 		cfg.Channels = append(cfg.Channels, channels...)
 		cfg.Bundles = append(cfg.Bundles, bundles...)
@@ -128,6 +130,52 @@ func ModelRelatedImagesToRelatedImages(relatedImages []model.RelatedImage) []Rel
 			Name:  ri.Name,
 			Image: ri.Image,
 		})
+	}
+	return out
+}
+
+func convertVersionLifecyclesFromModel(in []model.VersionLifecycle) []VersionLifecycle {
+	if len(in) == 0 {
+		return nil
+	}
+	out := make([]VersionLifecycle, len(in))
+	for i, lc := range in {
+		out[i] = VersionLifecycle{
+			Version:       lc.Version,
+			Compatibility: convertCompatibilityFromModel(lc.Compatibility),
+			Phases:        convertPhasesFromModel(lc.Phases),
+		}
+	}
+	return out
+}
+
+func convertCompatibilityFromModel(in []model.PlatformCompatibility) []PlatformCompatibility {
+	if len(in) == 0 {
+		return nil
+	}
+	out := make([]PlatformCompatibility, len(in))
+	for i, pc := range in {
+		out[i] = PlatformCompatibility{
+			Platform: pc.Platform,
+			Versions: pc.Versions,
+		}
+	}
+	return out
+}
+
+func convertPhasesFromModel(in []model.LifecyclePhase) []LifecyclePhase {
+	if len(in) == 0 {
+		return nil
+	}
+	out := make([]LifecyclePhase, len(in))
+	for i, phase := range in {
+		out[i] = LifecyclePhase{
+			Name:      phase.Name,
+			StartDate: phase.StartDate.Format(time.RFC3339),
+		}
+		if phase.EndDate != nil {
+			out[i].EndDate = phase.EndDate.Format(time.RFC3339)
+		}
 	}
 	return out
 }

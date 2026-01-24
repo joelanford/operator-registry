@@ -2,6 +2,7 @@ package declcfg
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/blang/semver/v4"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -27,6 +28,11 @@ func ConvertToModel(cfg DeclarativeConfig) (model.Model, error) {
 			return nil, fmt.Errorf("invalid package name %q: %v", p.Name, errs)
 		}
 
+		// Validate versionLifecycles
+		if err := ValidateVersionLifecycles(p.Name, p.VersionLifecycles); err != nil {
+			return nil, err
+		}
+
 		mpkg := &model.Package{
 			Name:        p.Name,
 			Description: p.Description,
@@ -38,6 +44,10 @@ func ConvertToModel(cfg DeclarativeConfig) (model.Model, error) {
 				MediaType: p.Icon.MediaType,
 			}
 		}
+
+		// Convert versionLifecycles
+		mpkg.VersionLifecycles = convertVersionLifecyclesToModel(p.VersionLifecycles)
+
 		defaultChannels[p.Name] = p.DefaultChannel
 		mpkgs[p.Name] = mpkg
 	}
@@ -266,6 +276,56 @@ func relatedImagesToModelRelatedImages(in []RelatedImage) []model.RelatedImage {
 			Name:  p.Name,
 			Image: p.Image,
 		})
+	}
+	return out
+}
+
+func convertVersionLifecyclesToModel(in []VersionLifecycle) []model.VersionLifecycle {
+	if len(in) == 0 {
+		return nil
+	}
+	out := make([]model.VersionLifecycle, len(in))
+	for i, lc := range in {
+		out[i] = model.VersionLifecycle{
+			Version:       lc.Version,
+			Compatibility: convertCompatibilityToModel(lc.Compatibility),
+			Phases:        convertPhasesToModel(lc.Phases),
+		}
+	}
+	return out
+}
+
+func convertCompatibilityToModel(in []PlatformCompatibility) []model.PlatformCompatibility {
+	if len(in) == 0 {
+		return nil
+	}
+	out := make([]model.PlatformCompatibility, len(in))
+	for i, pc := range in {
+		out[i] = model.PlatformCompatibility{
+			Platform: pc.Platform,
+			Versions: pc.Versions,
+		}
+	}
+	return out
+}
+
+func convertPhasesToModel(in []LifecyclePhase) []model.LifecyclePhase {
+	if len(in) == 0 {
+		return nil
+	}
+	out := make([]model.LifecyclePhase, len(in))
+	for i, phase := range in {
+		// Parse startDate - validation already ensured it's valid RFC3339
+		startDate, _ := time.Parse(time.RFC3339, phase.StartDate)
+		out[i] = model.LifecyclePhase{
+			Name:      phase.Name,
+			StartDate: startDate,
+		}
+		// Parse endDate if present
+		if phase.EndDate != "" {
+			endDate, _ := time.Parse(time.RFC3339, phase.EndDate)
+			out[i].EndDate = &endDate
+		}
 	}
 	return out
 }

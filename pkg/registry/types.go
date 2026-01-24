@@ -96,8 +96,29 @@ type PackageManifest struct {
 	// DefaultChannelName is, if specified, the name of the default channel for the package. The
 	// default channel will be installed if no other channel is explicitly given. If the package
 	// has a single channel, then that channel is implicitly the default.
-	DefaultChannelName string       `json:"defaultChannel" yaml:"defaultChannel"`
-	Deprecation        *Deprecation `json:"deprecation,omitempty" yaml:"deprecation,omitempty"`
+	DefaultChannelName string              `json:"defaultChannel" yaml:"defaultChannel"`
+	Deprecation        *Deprecation        `json:"deprecation,omitempty" yaml:"deprecation,omitempty"`
+	VersionLifecycles  []VersionLifecycle  `json:"versionLifecycles,omitempty" yaml:"versionLifecycles,omitempty"`
+}
+
+// VersionLifecycle holds lifecycle metadata for an operator version.
+type VersionLifecycle struct {
+	Version       string                  `json:"version" yaml:"version"`
+	Compatibility []PlatformCompatibility `json:"compatibility,omitempty" yaml:"compatibility,omitempty"`
+	Phases        []LifecyclePhase        `json:"phases,omitempty" yaml:"phases,omitempty"`
+}
+
+// PlatformCompatibility holds platform version compatibility information.
+type PlatformCompatibility struct {
+	Platform string   `json:"platform" yaml:"platform"`
+	Versions []string `json:"versions" yaml:"versions"`
+}
+
+// LifecyclePhase holds lifecycle phase information.
+type LifecyclePhase struct {
+	Name      string `json:"name" yaml:"name"`
+	StartDate string `json:"startDate" yaml:"startDate"`
+	EndDate   string `json:"endDate,omitempty" yaml:"endDate,omitempty"`
 }
 
 // GetDefaultChannel gets the default channel or returns the only one if there's only one. returns empty string if it

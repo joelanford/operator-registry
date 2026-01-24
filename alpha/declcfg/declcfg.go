@@ -31,12 +31,30 @@ type DeclarativeConfig struct {
 }
 
 type Package struct {
-	Schema         string              `json:"schema"`
-	Name           string              `json:"name"`
-	DefaultChannel string              `json:"defaultChannel"`
-	Icon           *Icon               `json:"icon,omitempty"`
-	Description    string              `json:"description,omitempty"`
-	Properties     []property.Property `json:"properties,omitempty" hash:"set"`
+	Schema            string              `json:"schema"`
+	Name              string              `json:"name"`
+	DefaultChannel    string              `json:"defaultChannel"`
+	Icon              *Icon               `json:"icon,omitempty"`
+	Description       string              `json:"description,omitempty"`
+	Properties        []property.Property `json:"properties,omitempty" hash:"set"`
+	VersionLifecycles []VersionLifecycle  `json:"versionLifecycles,omitempty"`
+}
+
+type VersionLifecycle struct {
+	Version       string                  `json:"version"`
+	Compatibility []PlatformCompatibility `json:"compatibility,omitempty"`
+	Phases        []LifecyclePhase        `json:"phases,omitempty"`
+}
+
+type PlatformCompatibility struct {
+	Platform string   `json:"platform"`
+	Versions []string `json:"versions"`
+}
+
+type LifecyclePhase struct {
+	Name      string `json:"name"`
+	StartDate string `json:"startDate"`
+	EndDate   string `json:"endDate,omitempty"`
 }
 
 type Icon struct {

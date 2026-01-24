@@ -46,11 +46,58 @@ func (pkgs packageIndex) GetPackage(_ context.Context, name string) (*registry.P
 		PackageName:        pkg.Name,
 		Channels:           channels,
 		DefaultChannelName: pkg.DefaultChannel,
+		VersionLifecycles:  modelVersionLifecyclesToRegistry(pkg.VersionLifecycles),
 	}
 	if pkg.Deprecation != nil {
 		registryPackage.Deprecation = &registry.Deprecation{Message: pkg.Deprecation.Message}
 	}
 	return registryPackage, nil
+}
+
+func modelVersionLifecyclesToRegistry(in []model.VersionLifecycle) []registry.VersionLifecycle {
+	if len(in) == 0 {
+		return nil
+	}
+	out := make([]registry.VersionLifecycle, len(in))
+	for i, lc := range in {
+		out[i] = registry.VersionLifecycle{
+			Version:       lc.Version,
+			Compatibility: modelCompatibilityToRegistry(lc.Compatibility),
+			Phases:        modelPhasesToRegistry(lc.Phases),
+		}
+	}
+	return out
+}
+
+func modelCompatibilityToRegistry(in []model.PlatformCompatibility) []registry.PlatformCompatibility {
+	if len(in) == 0 {
+		return nil
+	}
+	out := make([]registry.PlatformCompatibility, len(in))
+	for i, pc := range in {
+		out[i] = registry.PlatformCompatibility{
+			Platform: pc.Platform,
+			Versions: pc.Versions,
+		}
+	}
+	return out
+}
+
+func modelPhasesToRegistry(in []model.LifecyclePhase) []registry.LifecyclePhase {
+	if len(in) == 0 {
+		return nil
+	}
+	out := make([]registry.LifecyclePhase, len(in))
+	for i, phase := range in {
+		out[i] = registry.LifecyclePhase{
+			Name:      phase.Name,
+			StartDate: phase.StartDate.Format("2006-01-02T15:04:05Z07:00"),
+		}
+		if phase.EndDate != nil {
+			out[i].EndDate = phase.EndDate.Format("2006-01-02T15:04:05Z07:00")
+		}
+	}
+	return out
 }
 
 func (pkgs packageIndex) GetChannelEntriesThatReplace(_ context.Context, name string) ([]*registry.ChannelEntry, error) {
@@ -190,12 +237,13 @@ func (pkgs packageIndex) GetBundleThatProvides(ctx context.Context, c Cache, gro
 }
 
 type cPkg struct {
-	Name           string      `json:"name"`
-	Description    string      `json:"description"`
-	Icon           *model.Icon `json:"icon"`
-	DefaultChannel string      `json:"defaultChannel"`
-	Channels       map[string]cChannel
-	Deprecation    *model.Deprecation `json:"deprecation,omitempty"`
+	Name              string                   `json:"name"`
+	Description       string                   `json:"description"`
+	Icon              *model.Icon              `json:"icon"`
+	DefaultChannel    string                   `json:"defaultChannel"`
+	Channels          map[string]cChannel
+	Deprecation       *model.Deprecation       `json:"deprecation,omitempty"`
+	VersionLifecycles []model.VersionLifecycle `json:"versionLifecycles,omitempty"`
 }
 
 type cChannel struct {
@@ -217,12 +265,13 @@ func packagesFromModel(m model.Model) (map[string]cPkg, error) {
 	pkgs := map[string]cPkg{}
 	for _, p := range m {
 		newP := cPkg{
-			Name:           p.Name,
-			Icon:           p.Icon,
-			Description:    p.Description,
-			DefaultChannel: p.DefaultChannel.Name,
-			Channels:       map[string]cChannel{},
-			Deprecation:    p.Deprecation,
+			Name:              p.Name,
+			Icon:              p.Icon,
+			Description:       p.Description,
+			DefaultChannel:    p.DefaultChannel.Name,
+			Channels:          map[string]cChannel{},
+			Deprecation:       p.Deprecation,
+			VersionLifecycles: p.VersionLifecycles,
 		}
 		for _, ch := range p.Channels {
 			head, err := ch.Head()

@@ -6,6 +6,7 @@ import (
 	"slices"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/blang/semver/v4"
 	"github.com/h2non/filetype"
@@ -20,6 +21,23 @@ import (
 
 type Deprecation struct {
 	Message string `json:"message"`
+}
+
+type VersionLifecycle struct {
+	Version       string
+	Compatibility []PlatformCompatibility
+	Phases        []LifecyclePhase
+}
+
+type PlatformCompatibility struct {
+	Platform string
+	Versions []string
+}
+
+type LifecyclePhase struct {
+	Name      string
+	StartDate time.Time
+	EndDate   *time.Time // nil = no end date
 }
 
 func init() {
@@ -45,12 +63,13 @@ func (m Model) Validate() error {
 }
 
 type Package struct {
-	Name           string
-	Description    string
-	Icon           *Icon
-	DefaultChannel *Channel
-	Channels       map[string]*Channel
-	Deprecation    *Deprecation
+	Name              string
+	Description       string
+	Icon              *Icon
+	DefaultChannel    *Channel
+	Channels          map[string]*Channel
+	Deprecation       *Deprecation
+	VersionLifecycles []VersionLifecycle
 }
 
 func (p *Package) Validate() error {

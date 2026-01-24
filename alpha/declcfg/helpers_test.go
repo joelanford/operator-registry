@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"sort"
 	"testing"
+	"time"
 
 	"github.com/blang/semver/v4"
 	"github.com/stretchr/testify/assert"
@@ -15,8 +16,9 @@ import (
 )
 
 type validDeclarativeConfigSpec struct {
-	IncludeUnrecognized bool
-	IncludeDeprecations bool
+	IncludeUnrecognized      bool
+	IncludeDeprecations      bool
+	IncludeVersionLifecycles bool
 }
 
 func buildValidDeclarativeConfig(spec validDeclarativeConfigSpec) DeclarativeConfig {
@@ -76,10 +78,24 @@ func buildValidDeclarativeConfig(spec validDeclarativeConfigSpec) DeclarativeCon
 		}
 	}
 
+	anakinPkg := newTestPackage("anakin", "dark", svgSmallCircle)
+	bobaFettPkg := newTestPackage("boba-fett", "mando", svgBigCircle)
+
+	if spec.IncludeVersionLifecycles {
+		anakinPkg.VersionLifecycles = []VersionLifecycle{
+			testVersionLifecycle("0.0"),
+			testVersionLifecycle("0.1"),
+		}
+		bobaFettPkg.VersionLifecycles = []VersionLifecycle{
+			testVersionLifecycle("1.0"),
+			testVersionLifecycle("2.0"),
+		}
+	}
+
 	return DeclarativeConfig{
 		Packages: []Package{
-			newTestPackage("anakin", "dark", svgSmallCircle),
-			newTestPackage("boba-fett", "mando", svgBigCircle),
+			anakinPkg,
+			bobaFettPkg,
 		},
 		Channels: []Channel{
 			newTestChannel("anakin", "dark",
@@ -361,4 +377,64 @@ func equalsDeclarativeConfig(t *testing.T, expected, actual DeclarativeConfig) {
 	expected.Bundles, actual.Bundles = nil, nil
 	expected.Others, actual.Others = nil, nil
 	assert.Equal(t, expected, actual)
+}
+
+// testVersionLifecycle creates a test VersionLifecycle for declcfg with the given version.
+func testVersionLifecycle(version string) VersionLifecycle {
+	return VersionLifecycle{
+		Version: version,
+		Compatibility: []PlatformCompatibility{
+			{Platform: "OpenShift", Versions: []string{"4.14", "4.15"}},
+			{Platform: "Kubernetes", Versions: []string{"1.27", "1.28"}},
+		},
+		Phases: []LifecyclePhase{
+			{Name: "tech-preview", StartDate: "2024-01-01T00:00:00Z", EndDate: "2024-03-01T00:00:00Z"},
+			{Name: "GA", StartDate: "2024-03-01T00:00:00Z", EndDate: "2025-06-01T00:00:00Z"},
+			{Name: "EOL", StartDate: "2025-06-01T00:00:00Z"},
+		},
+	}
+}
+
+// testModelVersionLifecycle creates a test VersionLifecycle for model with the given version.
+func testModelVersionLifecycle(version string) model.VersionLifecycle {
+	techPreviewStart := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
+	gaStart := time.Date(2024, 3, 1, 0, 0, 0, 0, time.UTC)
+	eolStart := time.Date(2025, 6, 1, 0, 0, 0, 0, time.UTC)
+	return model.VersionLifecycle{
+		Version: version,
+		Compatibility: []model.PlatformCompatibility{
+			{Platform: "OpenShift", Versions: []string{"4.14", "4.15"}},
+			{Platform: "Kubernetes", Versions: []string{"1.27", "1.28"}},
+		},
+		Phases: []model.LifecyclePhase{
+			{Name: "tech-preview", StartDate: techPreviewStart, EndDate: &gaStart},
+			{Name: "GA", StartDate: gaStart, EndDate: &eolStart},
+			{Name: "EOL", StartDate: eolStart, EndDate: nil},
+		},
+	}
+}
+
+func buildTestModelWithLifecycles() model.Model {
+	return model.Model{
+		"anakin":    buildAnakinPkgModelWithLifecycles(),
+		"boba-fett": buildBobaFettPkgModelWithLifecycles(),
+	}
+}
+
+func buildAnakinPkgModelWithLifecycles() *model.Package {
+	pkg := buildAnakinPkgModel()
+	pkg.VersionLifecycles = []model.VersionLifecycle{
+		testModelVersionLifecycle("0.0"),
+		testModelVersionLifecycle("0.1"),
+	}
+	return pkg
+}
+
+func buildBobaFettPkgModelWithLifecycles() *model.Package {
+	pkg := buildBobaFettPkgModel()
+	pkg.VersionLifecycles = []model.VersionLifecycle{
+		testModelVersionLifecycle("1.0"),
+		testModelVersionLifecycle("2.0"),
+	}
+	return pkg
 }

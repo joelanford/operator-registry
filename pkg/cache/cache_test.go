@@ -598,6 +598,132 @@ var validFS = fstest.MapFS{
 	},
 }
 
+// lifecycleFS is a test FS with a package that includes version lifecycles
+var lifecycleFS = fstest.MapFS{
+	".": &fstest.MapFile{
+		Mode: fs.ModeDir,
+	},
+	"lifecycle-operator.json": &fstest.MapFile{
+		Data: []byte(`{
+    "schema": "olm.package",
+    "name": "lifecycle-operator",
+    "defaultChannel": "stable",
+    "versionLifecycles": [
+        {
+            "version": "1.0",
+            "compatibility": [
+                {"platform": "OpenShift", "versions": ["4.14", "4.15"]},
+                {"platform": "Kubernetes", "versions": ["1.27", "1.28"]}
+            ],
+            "phases": [
+                {"name": "tech-preview", "startDate": "2024-01-01T00:00:00Z", "endDate": "2024-03-01T00:00:00Z"},
+                {"name": "GA", "startDate": "2024-03-01T00:00:00Z", "endDate": "2025-06-01T00:00:00Z"},
+                {"name": "EOL", "startDate": "2025-06-01T00:00:00Z"}
+            ]
+        },
+        {
+            "version": "2.0",
+            "compatibility": [
+                {"platform": "OpenShift", "versions": ["4.15", "4.16", "4.17"]}
+            ],
+            "phases": [
+                {"name": "GA", "startDate": "2025-01-01T00:00:00Z"}
+            ]
+        }
+    ]
+}
+{
+    "schema": "olm.channel",
+    "package": "lifecycle-operator",
+    "name": "stable",
+    "entries": [
+        {"name": "lifecycle-operator.v1.0.0"},
+        {"name": "lifecycle-operator.v2.0.0", "replaces": "lifecycle-operator.v1.0.0"}
+    ]
+}
+{
+    "schema": "olm.bundle",
+    "name": "lifecycle-operator.v1.0.0",
+    "package": "lifecycle-operator",
+    "image": "quay.io/example/lifecycle-operator:v1.0.0",
+    "properties": [
+        {
+            "type": "olm.package",
+            "value": {"packageName": "lifecycle-operator", "version": "1.0.0"}
+        }
+    ]
+}
+{
+    "schema": "olm.bundle",
+    "name": "lifecycle-operator.v2.0.0",
+    "package": "lifecycle-operator",
+    "image": "quay.io/example/lifecycle-operator:v2.0.0",
+    "properties": [
+        {
+            "type": "olm.package",
+            "value": {"packageName": "lifecycle-operator", "version": "2.0.0"}
+        }
+    ]
+}`),
+	},
+}
+
+func TestCache_GetPackage_WithVersionLifecycles(t *testing.T) {
+	for name, testQuerier := range genTestCaches(t, lifecycleFS) {
+		t.Run(name, func(t *testing.T) {
+			p, err := testQuerier.GetPackage(context.TODO(), "lifecycle-operator")
+			require.NoError(t, err)
+			require.NotNil(t, p)
+
+			// Verify basic package info
+			require.Equal(t, "lifecycle-operator", p.PackageName)
+			require.Equal(t, "stable", p.DefaultChannelName)
+
+			// Verify version lifecycles
+			require.Len(t, p.VersionLifecycles, 2)
+
+			// Check first lifecycle (version 1.0)
+			lc1 := p.VersionLifecycles[0]
+			require.Equal(t, "1.0", lc1.Version)
+			require.Len(t, lc1.Compatibility, 2)
+			require.Equal(t, "OpenShift", lc1.Compatibility[0].Platform)
+			require.Equal(t, []string{"4.14", "4.15"}, lc1.Compatibility[0].Versions)
+			require.Equal(t, "Kubernetes", lc1.Compatibility[1].Platform)
+			require.Equal(t, []string{"1.27", "1.28"}, lc1.Compatibility[1].Versions)
+
+			require.Len(t, lc1.Phases, 3)
+			require.Equal(t, "tech-preview", lc1.Phases[0].Name)
+			require.Equal(t, "2024-01-01T00:00:00Z", lc1.Phases[0].StartDate)
+			require.Equal(t, "2024-03-01T00:00:00Z", lc1.Phases[0].EndDate)
+			require.Equal(t, "GA", lc1.Phases[1].Name)
+			require.Equal(t, "EOL", lc1.Phases[2].Name)
+			require.Empty(t, lc1.Phases[2].EndDate, "EOL phase should have no end date")
+
+			// Check second lifecycle (version 2.0)
+			lc2 := p.VersionLifecycles[1]
+			require.Equal(t, "2.0", lc2.Version)
+			require.Len(t, lc2.Compatibility, 1)
+			require.Equal(t, "OpenShift", lc2.Compatibility[0].Platform)
+			require.Equal(t, []string{"4.15", "4.16", "4.17"}, lc2.Compatibility[0].Versions)
+			require.Len(t, lc2.Phases, 1)
+			require.Equal(t, "GA", lc2.Phases[0].Name)
+			require.Empty(t, lc2.Phases[0].EndDate, "open-ended phase should have no end date")
+		})
+	}
+}
+
+func TestCache_GetPackage_WithoutVersionLifecycles(t *testing.T) {
+	// Test that packages without version lifecycles return nil/empty
+	for name, testQuerier := range genTestCaches(t, validFS) {
+		t.Run(name, func(t *testing.T) {
+			p, err := testQuerier.GetPackage(context.TODO(), "etcd")
+			require.NoError(t, err)
+			require.NotNil(t, p)
+			require.Nil(t, p.VersionLifecycles, "packages without lifecycles should have nil VersionLifecycles")
+		})
+	}
+}
+
 var badBundleFS = fstest.MapFS{
 	"cockroachdb.json": &fstest.MapFile{
 		Data: []byte(`{

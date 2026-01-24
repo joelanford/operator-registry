@@ -565,6 +565,189 @@ func TestConvertToModelRoundtrip(t *testing.T) {
 	assert.Empty(t, actual.Others, "expected unrecognized schemas not to make the roundtrip")
 }
 
+func TestConvertToModelRoundtripWithVersionLifecycles(t *testing.T) {
+	expected := buildValidDeclarativeConfig(validDeclarativeConfigSpec{
+		IncludeUnrecognized:      true,
+		IncludeDeprecations:      false,
+		IncludeVersionLifecycles: true,
+	})
+
+	m, err := ConvertToModel(expected)
+	require.NoError(t, err)
+	actual := ConvertFromModel(m)
+
+	removeJSONWhitespace(&expected)
+	removeJSONWhitespace(&actual)
+
+	assert.Equal(t, expected.Packages, actual.Packages)
+	assert.Equal(t, expected.Bundles, actual.Bundles)
+	assert.Empty(t, actual.Others, "expected unrecognized schemas not to make the roundtrip")
+
+	// Verify version lifecycles made the roundtrip
+	for _, pkg := range actual.Packages {
+		switch pkg.Name {
+		case "anakin":
+			require.Len(t, pkg.VersionLifecycles, 2, "expected anakin to have 2 version lifecycles")
+			assert.Equal(t, "0.0", pkg.VersionLifecycles[0].Version)
+			assert.Equal(t, "0.1", pkg.VersionLifecycles[1].Version)
+		case "boba-fett":
+			require.Len(t, pkg.VersionLifecycles, 2, "expected boba-fett to have 2 version lifecycles")
+			assert.Equal(t, "1.0", pkg.VersionLifecycles[0].Version)
+			assert.Equal(t, "2.0", pkg.VersionLifecycles[1].Version)
+		}
+	}
+}
+
+func TestConvertToModel_VersionLifecycleConversion(t *testing.T) {
+	fooPkg := newTestPackage("foo", "alpha", svgSmallCircle)
+	fooPkg.VersionLifecycles = []VersionLifecycle{
+		{
+			Version: "1.0",
+			Compatibility: []PlatformCompatibility{
+				{Platform: "OpenShift", Versions: []string{"4.14", "4.15", "4.16"}},
+				{Platform: "Kubernetes", Versions: []string{"1.27", "1.28"}},
+			},
+			Phases: []LifecyclePhase{
+				{Name: "tech-preview", StartDate: "2024-01-15T00:00:00Z", EndDate: "2024-04-01T00:00:00Z"},
+				{Name: "GA", StartDate: "2024-04-01T00:00:00Z", EndDate: "2025-12-31T23:59:59Z"},
+				{Name: "EOL", StartDate: "2025-12-31T23:59:59Z"},
+			},
+		},
+		{
+			Version: "2.0",
+			Compatibility: []PlatformCompatibility{
+				{Platform: "OpenShift", Versions: []string{"4.16", "4.17"}},
+			},
+			Phases: []LifecyclePhase{
+				{Name: "GA", StartDate: "2025-01-01T00:00:00Z"},
+			},
+		},
+	}
+
+	cfg := DeclarativeConfig{
+		Packages: []Package{fooPkg},
+		Channels: []Channel{newTestChannel("foo", "alpha", ChannelEntry{Name: "foo.v0.1.0"})},
+		Bundles:  []Bundle{newTestBundle("foo", "0.1.0")},
+	}
+
+	m, err := ConvertToModel(cfg)
+	require.NoError(t, err)
+
+	pkg, ok := m["foo"]
+	require.True(t, ok, "expected package 'foo' to be present")
+
+	// Verify version lifecycles were converted
+	require.Len(t, pkg.VersionLifecycles, 2)
+
+	// Check first lifecycle
+	lc1 := pkg.VersionLifecycles[0]
+	assert.Equal(t, "1.0", lc1.Version)
+	require.Len(t, lc1.Compatibility, 2)
+	assert.Equal(t, "OpenShift", lc1.Compatibility[0].Platform)
+	assert.Equal(t, []string{"4.14", "4.15", "4.16"}, lc1.Compatibility[0].Versions)
+	assert.Equal(t, "Kubernetes", lc1.Compatibility[1].Platform)
+	assert.Equal(t, []string{"1.27", "1.28"}, lc1.Compatibility[1].Versions)
+
+	require.Len(t, lc1.Phases, 3)
+	assert.Equal(t, "tech-preview", lc1.Phases[0].Name)
+	assert.Equal(t, 2024, lc1.Phases[0].StartDate.Year())
+	assert.Equal(t, 1, int(lc1.Phases[0].StartDate.Month()))
+	assert.Equal(t, 15, lc1.Phases[0].StartDate.Day())
+	require.NotNil(t, lc1.Phases[0].EndDate)
+	assert.Equal(t, 2024, lc1.Phases[0].EndDate.Year())
+	assert.Equal(t, 4, int(lc1.Phases[0].EndDate.Month()))
+
+	assert.Equal(t, "GA", lc1.Phases[1].Name)
+	assert.Equal(t, "EOL", lc1.Phases[2].Name)
+	assert.Nil(t, lc1.Phases[2].EndDate, "EOL phase should have no end date")
+
+	// Check second lifecycle
+	lc2 := pkg.VersionLifecycles[1]
+	assert.Equal(t, "2.0", lc2.Version)
+	require.Len(t, lc2.Compatibility, 1)
+	require.Len(t, lc2.Phases, 1)
+	assert.Nil(t, lc2.Phases[0].EndDate, "open-ended phase should have no end date")
+}
+
+func TestConvertToModel_VersionLifecycleValidationErrors(t *testing.T) {
+	type spec struct {
+		name       string
+		lifecycles []VersionLifecycle
+		errContain string
+	}
+
+	specs := []spec{
+		{
+			name: "invalid version format",
+			lifecycles: []VersionLifecycle{
+				{Version: "1.2.3"}, // should be X.Y format
+			},
+			errContain: "must be in X.Y format",
+		},
+		{
+			name: "duplicate version",
+			lifecycles: []VersionLifecycle{
+				{Version: "1.0"},
+				{Version: "1.0"},
+			},
+			errContain: "duplicate versionLifecycle",
+		},
+		{
+			name: "empty platform",
+			lifecycles: []VersionLifecycle{
+				{
+					Version: "1.0",
+					Compatibility: []PlatformCompatibility{
+						{Platform: "", Versions: []string{"4.14"}},
+					},
+				},
+			},
+			errContain: "platform must not be empty",
+		},
+		{
+			name: "invalid startDate format",
+			lifecycles: []VersionLifecycle{
+				{
+					Version: "1.0",
+					Phases: []LifecyclePhase{
+						{Name: "GA", StartDate: "2024-01-01"}, // should be RFC3339
+					},
+				},
+			},
+			errContain: "must be RFC3339 format",
+		},
+		{
+			name: "startDate after endDate",
+			lifecycles: []VersionLifecycle{
+				{
+					Version: "1.0",
+					Phases: []LifecyclePhase{
+						{Name: "GA", StartDate: "2025-01-01T00:00:00Z", EndDate: "2024-01-01T00:00:00Z"},
+					},
+				},
+			},
+			errContain: "startDate must be before endDate",
+		},
+	}
+
+	for _, s := range specs {
+		t.Run(s.name, func(t *testing.T) {
+			fooPkg := newTestPackage("foo", "alpha", svgSmallCircle)
+			fooPkg.VersionLifecycles = s.lifecycles
+
+			cfg := DeclarativeConfig{
+				Packages: []Package{fooPkg},
+				Channels: []Channel{newTestChannel("foo", "alpha", ChannelEntry{Name: "foo.v0.1.0"})},
+				Bundles:  []Bundle{newTestBundle("foo", "0.1.0")},
+			}
+
+			_, err := ConvertToModel(cfg)
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), s.errContain)
+		})
+	}
+}
+
 func hasError(expectedError string) require.ErrorAssertionFunc {
 	return func(t require.TestingT, actualError error, args ...interface{}) {
 		if stdt, ok := t.(*testing.T); ok {
